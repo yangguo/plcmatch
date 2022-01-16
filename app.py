@@ -3,7 +3,7 @@ import pandas as pd
 
 from analysis import get_matchplc,do_plot_match,df2list
 from checkrule import searchByName, searchByItem,get_rule_data
-from utils import get_folder_list, get_section_list
+from utils import get_folder_list, get_section_list,get_most_similar,get_keywords
 from upload import save_uploadedfile,upload_data,get_uploadfiles,remove_uploadfiles,get_upload_data
 
 rulefolder = 'rules'
@@ -74,68 +74,91 @@ def main():
         rule_index = subruledf.index.tolist()
         subrule_embeddings = rule_embeddings[rule_index]
 
-        top = st.sidebar.slider('匹配数量选择',
+        # choose match method
+        match_method = st.sidebar.radio('匹配方法选择', ('关键字匹配','语义匹配', '制度审阅'))
+
+        if match_method == '关键字匹配':
+            # silidebar to choose key_num
+            key_num = st.sidebar.slider('选择关键词数量', 1, 10, 3)
+            # get top number 
+            top_num = st.sidebar.slider('选择匹配结果数量', 1, 10, 3)
+            # display button
+            submit = st.sidebar.button('开始匹配分析')
+            if submit:
+                proc_list=subruledf['条款'].tolist()
+                audit_list=uploaddf['条款'].tolist()
+                # get keywords list
+                keywords_list = get_keywords(proc_list, key_num)
+                resultls=get_most_similar(keywords_list,audit_list, top_num)
+                # display result
+                for i,(proc, keywords,result) in enumerate(zip(proc_list, keywords_list,resultls)):
+                    st.info('序号' + str(i + 1) + ': ' + proc)
+                    st.warning('关键词: '+'/'.join(keywords))
+                    # get subuploaddf based on index list
+                    subuploaddf = uploaddf.loc[result]
+                    # display result
+                    st.table(subuploaddf)
+                    st.write('-'*20)
+
+        else:
+            top = st.sidebar.slider('匹配数量选择',
                                 min_value=1,
                                 max_value=10,
                                 value=2)
 
-        x = st.sidebar.slider('匹配阈值选择%',
+            x = st.sidebar.slider('匹配阈值选择%',
                                 min_value=0,
                                 max_value=100,
                                 value=80)
-        st.sidebar.write('匹配阈值:', x / 100)
+            st.sidebar.write('匹配阈值:', x / 100)
+            if match_method == '语义匹配':
+                querydf, query_embeddings = subruledf, subrule_embeddings
+                sentencedf, sentence_embeddings = uploaddf, upload_embeddings
 
-        # reverse upload and rule
-        reversed = st.sidebar.radio('匹配模式', ('匹配分析', '制度审阅'))
+            elif match_method == '制度审阅':
+                querydf, query_embeddings = uploaddf, upload_embeddings
+                sentencedf, sentence_embeddings = subruledf, subrule_embeddings
 
-        if reversed == '匹配分析':
-            querydf, query_embeddings = subruledf, subrule_embeddings
-            sentencedf, sentence_embeddings = uploaddf, upload_embeddings
+            validdf = get_matchplc(querydf, query_embeddings, sentencedf,
+                                    sentence_embeddings, top)
+            combdf = pd.concat([querydf.reset_index(drop=True), validdf],
+                                axis=1)
+            match = st.sidebar.radio('条款匹配分析条件', ('查看匹配条款', '查看不匹配条款'))
+        
+            if match == '查看匹配条款':
+                combdf['是否匹配'] = (combdf['匹配度'] >= x / 100).astype(int)
+            else:
+                combdf['是否匹配'] = (combdf['匹配度'] < x / 100).astype(int)
 
-        else:
-            querydf, query_embeddings = uploaddf, upload_embeddings
-            sentencedf, sentence_embeddings = subruledf, subrule_embeddings
+            if reversed == '匹配分析':
+                do_plot_match(combdf, match)
 
-        validdf = get_matchplc(querydf, query_embeddings, sentencedf,
-                                sentence_embeddings, top)
-        combdf = pd.concat([querydf.reset_index(drop=True), validdf],
-                            axis=1)
-        match = st.sidebar.radio('条款匹配分析条件', ('查看匹配条款', '查看不匹配条款'))
-    
-        if match == '查看匹配条款':
-            combdf['是否匹配'] = (combdf['匹配度'] >= x / 100).astype(int)
-        else:
-            combdf['是否匹配'] = (combdf['匹配度'] < x / 100).astype(int)
+            sampledf = combdf.loc[
+                combdf['是否匹配'] == 1,
+                ['监管要求', '结构', '条款', '匹配条款', '匹配章节', '匹配制度', '匹配度']]
 
-        if reversed == '匹配分析':
-            do_plot_match(combdf, match)
+            st.sidebar.write('内部制度: ', '/'.join(upload_choice))
+            st.sidebar.write('监管要求: ', '/'.join(rule_choice))
+            st.sidebar.write('章节: ', column_rule)
 
-        sampledf = combdf.loc[
-            combdf['是否匹配'] == 1,
-            ['监管要求', '结构', '条款', '匹配条款', '匹配章节', '匹配制度', '匹配度']]
+            # calculate the percentage of matched items
+            matchrate = sampledf.shape[0] / combdf.shape[0]
+            st.sidebar.write('匹配率:', matchrate)
+            st.sidebar.write('总数:', sampledf.shape[0], '/', combdf.shape[0])
 
-        st.sidebar.write('内部制度: ', '/'.join(upload_choice))
-        st.sidebar.write('监管要求: ', '/'.join(rule_choice))
-        st.sidebar.write('章节: ', column_rule)
-
-        # calculate the percentage of matched items
-        matchrate = sampledf.shape[0] / combdf.shape[0]
-        st.sidebar.write('匹配率:', matchrate)
-        st.sidebar.write('总数:', sampledf.shape[0], '/', combdf.shape[0])
-
-        dis1ls, dis2ls, dis3ls = df2list(sampledf)
-        # enumerate each list with index
-        for i, (dis1, dis2, dis3) in enumerate(zip(dis1ls, dis2ls,
-                                                    dis3ls)):
-            st.info('序号' + str(i + 1) + ': ' + dis1)
-            st.warning(dis2)
-            st.table(dis3)
-        # analysis is done
-        st.sidebar.success('分析完成')
-        st.sidebar.download_button(label='下载结果',
-                            file_name='内外部合规分析结果.csv',
-                            data=sampledf.to_csv(),
-                            mime='text/csv')
+            dis1ls, dis2ls, dis3ls = df2list(sampledf)
+            # enumerate each list with index
+            for i, (dis1, dis2, dis3) in enumerate(zip(dis1ls, dis2ls,
+                                                        dis3ls)):
+                st.info('序号' + str(i + 1) + ': ' + dis1)
+                st.warning(dis2)
+                st.table(dis3)
+            # analysis is done
+            st.sidebar.success('分析完成')
+            st.sidebar.download_button(label='下载结果',
+                                file_name='内外部合规分析结果.csv',
+                                data=sampledf.to_csv(),
+                                mime='text/csv')
 
 
 if __name__ == '__main__':

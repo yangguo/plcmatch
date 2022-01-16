@@ -4,6 +4,8 @@ import pandas as pd
 import streamlit as st
 import asyncio
 import torch
+import jieba.analyse
+import spacy
 
 from textrank4zh import TextRank4Sentence
 from transformers import RoFormerModel, RoFormerTokenizer
@@ -13,6 +15,8 @@ rulefolder = 'rules'
 
 tokenizer = RoFormerTokenizer.from_pretrained(modelfolder)
 model = RoFormerModel.from_pretrained(modelfolder)
+
+nlp = spacy.load('zh_core_web_trf')
 
 
 # def async sent2emb(sentences):
@@ -79,6 +83,7 @@ def roformer_encoder(sentences):
     sentence_embeddings = mean_pooling(
         model_output, encoded_input['attention_mask']).numpy()
     return sentence_embeddings
+
 
 @st.cache
 def get_csvdf(rulefolder):
@@ -150,3 +155,96 @@ def get_rulefolder(industry_choice):
     # join folder with industry_choice
     folder = os.path.join(rulefolder, industry_choice)
     return folder
+
+
+def tfidfkeyword(text, top_n=5):
+    text = ' '.join(cut_sentences(text))
+    tags = jieba.analyse.extract_tags(text,
+                                      topK=top_n,
+                                      allowPOS=('ns', 'n', 'nr', 'm', 'ns',
+                                                'nt', 'nz', 't', 'q'))
+    return tags
+
+
+# cut text into words using spacy
+def cut_sentences(text):
+    # cut text into words
+    doc = nlp(text)
+    sents = [t.text for t in doc]
+    return sents
+
+
+# find similar words in doc embedding
+def find_similar_words(words, doc, threshold_key=0.5, top_n=3):
+    # compute similarity
+    similarities = {}
+    for word in words:
+        tok = nlp(word)
+        similarities[tok.text] = {}
+        for tok_ in doc:
+            similarities[tok.text].update({tok_.text: tok.similarity(tok_)})
+    # sort
+    topk = lambda x: {
+        k: v
+        for k, v in sorted(similarities[x].items(),
+                           key=lambda item: item[1],
+                           reverse=True)[:top_n]
+    }
+    result = {word: topk(word) for word in words}
+    # filter by threshold
+    result_filter = {
+        word: {k: v
+               for k, v in result[word].items() if v >= threshold_key}
+        for word in result
+    }
+    return result_filter
+
+
+# convert text spacy to word embedding
+def text2emb(text):
+    # cut text into words
+    doc = nlp(text)
+    return doc
+
+
+# get similarity using keywords between two docs
+def get_similar_keywords(keyls,
+                               audit_list,
+                               key_top_n=3,
+                               threshold_key=0.5):
+
+    audit_keywords = dict()
+    for idx,audit in enumerate(audit_list):
+
+        doc = text2emb(audit)
+        result = find_similar_words(keyls, doc, threshold_key, top_n=key_top_n)
+        subls = []
+        for key in keyls:
+            subls.append(list(result[key].keys()))
+        # flatten subls
+        subls = [item for sub in subls for item in sub]
+        # remove duplicates
+        subls = list(set(subls))
+        audit_keywords[idx] = subls
+
+        # get audit_keywords keys sorted by value length
+        audit_keywords_sorted = sorted(audit_keywords.items(), key=lambda x: len(x[1]), reverse=True)
+        # get keys of audit_keywords_sorted
+        audit_keywords_keys = [key for key, value in audit_keywords_sorted]
+    return audit_keywords_keys
+
+# get most similar from list of sentences
+def get_most_similar(key_list,audit_list, top_n=3):
+    
+    resultls=[]
+    for keyls in key_list:
+        audit_list_sorted = get_similar_keywords(keyls, audit_list, key_top_n=3,threshold_key=0.5)
+        resultls.append(audit_list_sorted[:top_n])
+    return resultls
+
+# get tfidf keywords list
+def get_keywords(proc_list, key_num=5):
+    key_list = []
+    for proc in proc_list:
+        key_list.append(tfidfkeyword(proc, key_num))
+    return key_list
