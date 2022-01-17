@@ -234,13 +234,9 @@ def get_similar_keywords(keyls,
     return audit_keywords_keys
 
 # get most similar from list of sentences
-def get_most_similar(key_list,audit_list, top_n=3):
-    
-    resultls=[]
-    for keyls in key_list:
-        audit_list_sorted = get_similar_keywords(keyls, audit_list, key_top_n=3,threshold_key=0.5)
-        resultls.append(audit_list_sorted[:top_n])
-    return resultls
+def get_most_similar(keyls,audit_list, top_n=3):
+    audit_list_sorted = get_similar_keywords(keyls, audit_list, key_top_n=3,threshold_key=0.5)
+    return audit_list_sorted[:top_n]
 
 # get tfidf keywords list
 def get_keywords(proc_list, key_num=5):

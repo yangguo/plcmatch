@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import ast
 
 from analysis import get_matchplc,do_plot_match,df2list
 from checkrule import searchByName, searchByItem,get_rule_data
@@ -82,23 +83,37 @@ def main():
             key_num = st.sidebar.slider('选择关键词数量', 1, 10, 3)
             # get top number 
             top_num = st.sidebar.slider('选择匹配结果数量', 1, 10, 3)
+
+            proc_list=subruledf['条款'].tolist()
+            # display proc_list
+            st.write('匹配监管要求：')
+            st.write(proc_list)
+            keywords_list = get_keywords(proc_list, key_num)
+            # display keywords_list
+            new_keywords_str=st.text_area('关键词列表：', keywords_list)
+            # read literal new_keywords_str as raw string
+            new_keywords_list=ast.literal_eval(new_keywords_str)
+
             # display button
             submit = st.sidebar.button('开始匹配分析')
             if submit:
-                proc_list=subruledf['条款'].tolist()
                 audit_list=uploaddf['条款'].tolist()
                 # get keywords list
-                keywords_list = get_keywords(proc_list, key_num)
-                resultls=get_most_similar(keywords_list,audit_list, top_num)
+
                 # display result
-                for i,(proc, keywords,result) in enumerate(zip(proc_list, keywords_list,resultls)):
-                    st.info('序号' + str(i + 1) + ': ' + proc)
-                    st.warning('关键词: '+'/'.join(keywords))
-                    # get subuploaddf based on index list
-                    subuploaddf = uploaddf.loc[result]
-                    # display result
-                    st.table(subuploaddf)
-                    st.write('-'*20)
+                for i,(proc, keywords) in enumerate(zip(proc_list, new_keywords_list)):
+                    with st.spinner('正在处理中...'):
+
+                        st.info('序号' + str(i + 1) + ': ' + proc)
+                        st.warning('关键词: '+'/'.join(keywords))
+
+                        result=get_most_similar(keywords,audit_list, top_num)
+
+                        # get subuploaddf based on index list
+                        subuploaddf = uploaddf.loc[result]
+                        # display result
+                        st.table(subuploaddf)
+                        st.write('-'*20)
 
         else:
             top = st.sidebar.slider('匹配数量选择',
