@@ -244,3 +244,13 @@ def get_keywords(proc_list, key_num=5):
     for proc in proc_list:
         key_list.append(tfidfkeyword(proc, key_num))
     return key_list
+
+# get exact match
+def get_exect_similar(searchresult, item_text,top_num):
+    # join item_text
+    item_text = ' '.join(item_text)
+    # split words item_text
+    item_text_list = split_words(item_text)
+    # print(item_text_list)
+    plcsam = searchresult[ (searchresult['条款'].str.contains(item_text_list))]
+    return plcsam[:top_num]

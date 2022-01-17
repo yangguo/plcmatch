@@ -4,7 +4,7 @@ import ast
 
 from analysis import get_matchplc,do_plot_match,df2list
 from checkrule import searchByName, searchByItem,get_rule_data
-from utils import get_folder_list, get_section_list,get_most_similar,get_keywords
+from utils import get_folder_list, get_section_list,get_most_similar,get_keywords,get_exect_similar
 from upload import save_uploadedfile,upload_data,get_uploadfiles,remove_uploadfiles,get_upload_data
 
 rulefolder = 'rules'
@@ -76,44 +76,60 @@ def main():
         subrule_embeddings = rule_embeddings[rule_index]
 
         # choose match method
-        match_method = st.sidebar.radio('匹配方法选择', ('关键字匹配','语义匹配', '制度审阅'))
+        match_method = st.sidebar.radio('匹配方法选择', ('精确关键字','模糊关键字','语义匹配', '制度审阅'))
 
-        if match_method == '关键字匹配':
+        if match_method == '精确关键字' or match_method == '模糊关键字':
             # silidebar to choose key_num
             key_num = st.sidebar.slider('选择关键词数量', 1, 10, 3)
             # get top number 
             top_num = st.sidebar.slider('选择匹配结果数量', 1, 10, 3)
 
-            proc_list=subruledf['条款'].tolist()
-            # display proc_list
-            st.write('匹配监管要求：')
-            st.write(proc_list)
-            keywords_list = get_keywords(proc_list, key_num)
-            # display keywords_list
-            new_keywords_str=st.text_area('关键词列表：', keywords_list)
-            # read literal new_keywords_str as raw string
-            new_keywords_list=ast.literal_eval(new_keywords_str)
+            # column_rule not empty
+            if column_rule != '':
+                proc_list=subruledf['条款'].tolist()
+                # display proc_list
+                st.write('匹配监管要求：')
+                st.write(proc_list)
+                keywords_list = get_keywords(proc_list, key_num)
+                # display keywords_list
+                new_keywords_str=st.text_area('关键词列表：', keywords_list)
+                # read literal new_keywords_str as raw string
+                new_keywords_list=ast.literal_eval(new_keywords_str)
 
             # display button
             submit = st.sidebar.button('开始匹配分析')
             if submit:
-                audit_list=uploaddf['条款'].tolist()
-                # get keywords list
 
-                # display result
-                for i,(proc, keywords) in enumerate(zip(proc_list, new_keywords_list)):
-                    with st.spinner('正在处理中...'):
+                if match_method == '精确关键字':
+                    for i,(proc, keywords) in enumerate(zip(proc_list, new_keywords_list)):
+                        with st.spinner('正在处理中...'):
 
-                        st.info('序号' + str(i + 1) + ': ' + proc)
-                        st.warning('关键词: '+'/'.join(keywords))
+                            st.info('序号' + str(i + 1) + ': ' + proc)
+                            st.warning('关键词: '+'/'.join(keywords))
 
-                        result=get_most_similar(keywords,audit_list, top_num)
+                            subuploaddf = get_exect_similar(uploaddf, keywords, top_num)
+                            # display result
+                            st.table(subuploaddf)
+                            st.write('-'*20)
 
-                        # get subuploaddf based on index list
-                        subuploaddf = uploaddf.loc[result]
-                        # display result
-                        st.table(subuploaddf)
-                        st.write('-'*20)
+                elif match_method == '模糊关键字':
+                    audit_list=uploaddf['条款'].tolist()
+                    # get keywords list
+
+                    # display result
+                    for i,(proc, keywords) in enumerate(zip(proc_list, new_keywords_list)):
+                        with st.spinner('正在处理中...'):
+
+                            st.info('序号' + str(i + 1) + ': ' + proc)
+                            st.warning('关键词: '+'/'.join(keywords))
+
+                            result=get_most_similar(keywords,audit_list, top_num)
+
+                            # get subuploaddf based on index list
+                            subuploaddf = uploaddf.loc[result]
+                            # display result
+                            st.table(subuploaddf)
+                            st.write('-'*20)
 
         else:
             top = st.sidebar.slider('匹配数量选择',
