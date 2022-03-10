@@ -4,11 +4,13 @@ import pandas as pd
 import streamlit as st
 import asyncio
 import torch
-import jieba.analyse
+# import jieba.analyse
 import spacy
 
 from textrank4zh import TextRank4Sentence
 from transformers import RoFormerModel, RoFormerTokenizer
+from keybert import KeyBERT
+from sentence_transformers import SentenceTransformer
 
 modelfolder = 'junnyu/roformer_chinese_sim_char_ft_base'
 rulefolder = 'rules'
@@ -16,6 +18,7 @@ rulefolder = 'rules'
 tokenizer = RoFormerTokenizer.from_pretrained(modelfolder)
 model = RoFormerModel.from_pretrained(modelfolder)
 
+smodel = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
 nlp = spacy.load('zh_core_web_trf')
 
 
@@ -157,13 +160,13 @@ def get_rulefolder(industry_choice):
     return folder
 
 
-def tfidfkeyword(text, top_n=5):
-    text = ' '.join(cut_sentences(text))
-    tags = jieba.analyse.extract_tags(text,
-                                      topK=top_n,
-                                      allowPOS=('ns', 'n', 'nr', 'm', 'ns',
-                                                'nt', 'nz', 't', 'q'))
-    return tags
+# def tfidfkeyword(text, top_n=5):
+#     text = ' '.join(cut_sentences(text))
+#     tags = jieba.analyse.extract_tags(text,
+#                                       topK=top_n,
+#                                       allowPOS=('ns', 'n', 'nr', 'm', 'ns',
+#                                                 'nt', 'nz', 't', 'q'))
+#     return tags
 
 
 # cut text into words using spacy
@@ -242,7 +245,7 @@ def get_most_similar(keyls,audit_list, top_n=3):
 def get_keywords(proc_list, key_num=5):
     key_list = []
     for proc in proc_list:
-        key_list.append(tfidfkeyword(proc, key_num))
+        key_list.append(keybert_keywords(proc, key_num))
     return key_list
 
 # get exact match
@@ -254,3 +257,16 @@ def get_exect_similar(searchresult, item_text,top_num):
     # print(item_text_list)
     plcsam = searchresult[ (searchresult['条款'].str.contains(item_text_list))]
     return plcsam[:top_num]
+
+# get keyword list using keybert
+def keybert_keywords(text, top_n=5):
+    doc=' '.join(cut_sentences(text))
+    bertModel = KeyBERT(model=smodel)
+    # keywords = bertModel.extract_keywords(doc,keyphrase_ngram_range=(1,1),stop_words=None,top_n=top_n) 
+    #mmr
+    keywords = bertModel.extract_keywords(doc, keyphrase_ngram_range=(3, 3), stop_words='english',
+                        use_mmr=True, diversity=0.7)
+    keyls=[]
+    for (key,val) in keywords:
+        keyls.append(key)
+    return keyls
