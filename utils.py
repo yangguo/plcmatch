@@ -264,7 +264,7 @@ def keybert_keywords(text, top_n=5):
     bertModel = KeyBERT(model=smodel)
     # keywords = bertModel.extract_keywords(doc,keyphrase_ngram_range=(1,1),stop_words=None,top_n=top_n) 
     #mmr
-    keywords = bertModel.extract_keywords(doc, keyphrase_ngram_range=(3, 3), stop_words='english',
+    keywords = bertModel.extract_keywords(doc, keyphrase_ngram_range=(1, 3), stop_words='english',
                         use_mmr=True, diversity=0.7)
     keyls=[]
     for (key,val) in keywords:
