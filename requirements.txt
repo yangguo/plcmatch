@@ -29,7 +29,7 @@ ipython
 ipython-genutils
 ipywidgets
 jedi
-jieba
+# jieba
 Jinja2
 joblib
 JPype1
@@ -106,7 +106,7 @@ pdfplumber
 spacy
 openpyxl
 textrank4zh
-spacy_transformers
+# spacy_transformers
 scikit-learn
 kaleido
 keybert
