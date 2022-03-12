@@ -110,6 +110,8 @@ textrank4zh
 scikit-learn
 kaleido
 keybert
-https://huggingface.co/spacy/zh_core_web_lg/resolve/main/zh_core_web_lg-any-py3-none
 # https://huggingface.co/spacy/zh_core_web_trf/resolve/main/zh_core_web_trf-any-py3-none-any.whl
 # https://github.com/explosion/spacy-models/releases/download/zh_core_web_trf-3.2.0/zh_core_web_trf-3.2.0-py3-none-any.whl
+# lg model
+https://github.com/explosion/spacy-models/releases/download/zh_core_web_lg-3.2.0/zh_core_web_lg-3.2.0-py3-none-any.whl
+# https://huggingface.co/spacy/zh_core_web_lg/resolve/main/zh_core_web_lg-any-py3-none
