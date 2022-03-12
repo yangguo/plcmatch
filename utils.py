@@ -19,7 +19,7 @@ tokenizer = RoFormerTokenizer.from_pretrained(modelfolder)
 model = RoFormerModel.from_pretrained(modelfolder)
 
 smodel = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
-nlp = spacy.load('zh_core_web_trf')
+nlp = spacy.load('zh_core_web_lg')
 
 
 # def async sent2emb(sentences):
