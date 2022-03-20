@@ -233,7 +233,7 @@ def get_similar_keywords(keyls,
         # get audit_keywords keys sorted by value length
         audit_keywords_sorted = sorted(audit_keywords.items(), key=lambda x: len(x[1]), reverse=True)
         # get keys of audit_keywords_sorted
-        audit_keywords_keys = [key for key, value in audit_keywords_sorted]
+        audit_keywords_keys = [key for key, value in audit_keywords_sorted if len(value) > 0]
     return audit_keywords_keys
 
 # get most similar from list of sentences
@@ -242,7 +242,7 @@ def get_most_similar(keyls,audit_list, top_n=3):
     return audit_list_sorted[:top_n]
 
 # get tfidf keywords list
-def get_keywords(proc_list, key_num=5):
+def get_keywords(proc_list, key_num=3):
     key_list = []
     for proc in proc_list:
         key_list.append(keybert_keywords(proc, key_num))
@@ -264,8 +264,8 @@ def keybert_keywords(text, top_n=5):
     bertModel = KeyBERT(model=smodel)
     # keywords = bertModel.extract_keywords(doc,keyphrase_ngram_range=(1,1),stop_words=None,top_n=top_n) 
     #mmr
-    keywords = bertModel.extract_keywords(doc, keyphrase_ngram_range=(1, 3), stop_words='english',
-                        use_mmr=True, diversity=0.7)
+    keywords = bertModel.extract_keywords(doc, keyphrase_ngram_range=(1, 1), stop_words='english',
+                        use_mmr=True, diversity=0.7,top_n=top_n)
     keyls=[]
     for (key,val) in keywords:
         keyls.append(key)
