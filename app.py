@@ -127,22 +127,43 @@ def main():
                         proc_df = pd.DataFrame({'条款': proc_list, '关键词': keywords_list})
                         st.table(proc_df)                       
                         # display keywords_list
-                        new_keywords_str = st.text_area(
-                            '关键词列表更新：', keywords_list)
-                        # read literal new_keywords_str as raw string
-                        new_keywords_list = ast.literal_eval(new_keywords_str)
+                        # new_keywords_str = st.text_area(
+                        #     '关键词列表更新：', keywords_list)
+                        # # read literal new_keywords_str as raw string
+                        # new_keywords_list = ast.literal_eval(new_keywords_str)
                         # update session value keyword_list
-                        st.session_state['keyword_list'] = new_keywords_list
+                        st.session_state['keyword_list'] = keywords_list
                         # update session value proc_list
                         st.session_state['proc_list'] = proc_list
                     else:
                         st.error('请选择章节')
-                        new_keywords_list = []
+                        keywords_list = []
                         proc_list = []
                 else:
-                    new_keywords_list = st.session_state['keyword_list']
+                    keywords_list = st.session_state['keyword_list']
                     proc_list = st.session_state['proc_list']
+                    proc_df = pd.DataFrame({'条款': proc_list, '关键词': keywords_list})
+                    if proc_df.empty:
+                        st.error('请先点击获取关键词')
+                    else:
+                        st.table(proc_df)                       
 
+                if keywords_list != []:
+                    # display keywords_list
+                    new_keywords_str = st.text_area(
+                        '关键词列表更新：', keywords_list)
+                    # read literal new_keywords_str as raw string
+                    new_keywords_list = ast.literal_eval(new_keywords_str)
+                else:
+                    new_keywords_list = []
+
+                # update keyword button
+                update_keywords_button = st.sidebar.button('更新关键词')
+                if update_keywords_button:
+                    st.session_state['keyword_list'] = new_keywords_list
+                else:
+                    new_keywords_list = st.session_state['keyword_list']
+ 
                 # display button
                 submit = st.sidebar.button('开始匹配分析')
                 if submit:
@@ -150,7 +171,7 @@ def main():
                     # new_keywords_list = st.session_state['keyword_list']
                     # # get proc_list
                     # proc_list = st.session_state['proc_list']
-
+                    st.subheader('匹配结果：')
                     if match_mode == '精确':
                         for i, (proc, keywords) in enumerate(
                                 zip(proc_list, new_keywords_list)):
