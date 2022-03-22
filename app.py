@@ -154,16 +154,11 @@ def main():
                         '关键词列表更新：', keywords_list)
                     # read literal new_keywords_str as raw string
                     new_keywords_list = ast.literal_eval(new_keywords_str)
-                else:
-                    new_keywords_list = []
-
-                # update keyword button
-                update_keywords_button = st.sidebar.button('更新关键词')
-                if update_keywords_button:
+                    # update session value keyword_list
                     st.session_state['keyword_list'] = new_keywords_list
                 else:
-                    new_keywords_list = st.session_state['keyword_list']
- 
+                    new_keywords_list = []
+                 
                 # display button
                 submit = st.sidebar.button('开始匹配分析')
                 if submit:
