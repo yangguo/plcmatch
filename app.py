@@ -5,7 +5,7 @@ import ast
 from analysis import get_matchplc, do_plot_match, df2list
 from checkrule import searchByName, searchByItem, get_rule_data
 from utils import get_folder_list, get_section_list, get_most_similar, get_keywords, get_exect_similar
-from upload import save_uploadedfile, upload_data, get_uploadfiles, remove_uploadfiles, get_upload_data
+from upload import save_uploadedfile, upload_data, get_uploadfiles, remove_uploadfiles, get_upload_data,savedf
 
 rulefolder = 'rules'
 
@@ -13,11 +13,11 @@ rulefolder = 'rules'
 def main():
 
     # st.subheader("制度匹配分析")
-    menu = ['文件上传', '制度匹配分析']
+    menu = ['文件上传','文件选择', '匹配分析']
     choice = st.sidebar.selectbox("选择", menu)
     if choice == '文件上传':
         uploaded_file_ls = st.file_uploader("选择新文件上传",
-                                            type=['docx', 'pdf', 'txt'],
+                                            type=['docx', 'pdf', 'txt','xlsx'],
                                             accept_multiple_files=True,
                                             help='选择文件上传')
 
@@ -30,8 +30,63 @@ def main():
                     ) | (uploaded_file.type == "application/pdf") | (
                         uploaded_file.type == "text/plain"):
                     save_uploadedfile(uploaded_file)
+
+                            # if upload file is xlsx
+                elif uploaded_file.type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
+                    # get sheet names list from excel file
+                    xls = pd.ExcelFile(uploaded_file)
+                    sheets = xls.sheet_names
+                    # choose sheet name and click button
+                    sheet_name = st.selectbox('选择表单', sheets)
+
+                    # choose header row
+                    header_row = st.number_input('选择表头行',
+                                                min_value=0,
+                                                max_value=10,
+                                                value=0,key='header_row')
+                    df = pd.read_excel(uploaded_file,
+                                    header=header_row,
+                                    sheet_name=sheet_name)
+                    # filllna
+                    df = df.fillna('')
+                    # display the first five rows
+                    st.write(df.astype(str))
+
+                    # get df columns
+                    cols = df.columns
+                    # choose proc_text and audit_text column
+                    proc_col = st.sidebar.selectbox('选择文本列', cols)
+                                                   
+                    # get proc_text and audit_text list
+                    proc_list = df[proc_col].tolist()
+
+                    # get proc_list and audit_list length
+                    proc_len = len(proc_list)
+
+                    # if proc_list or audit_list is empty or not equal
+                    if proc_len == 0:
+                        st.error('文本列为空，请重新选择')
+                        return
+                    else:
+                        # choose start and end index
+                        start_idx = st.sidebar.number_input('选择开始索引',
+                                                            min_value=0,
+                                                            max_value=proc_len - 1,
+                                                            value=0)
+                        end_idx = st.sidebar.number_input('选择结束索引',
+                                                        min_value=start_idx,
+                                                        max_value=proc_len - 1,
+                                                        value=proc_len - 1)
+                        # get proc_list and audit_list
+                        subproc_list = proc_list[start_idx:end_idx + 1]
+                        # get basename of uploaded file
+                        basename = uploaded_file.name.split('.')[0]
+                        # save subproc_list to file using upload
+                        savedf(subproc_list, basename)
+
                 else:
                     st.error('不支持文件类型')
+
         submit = st.button('文件编码')
         if submit:
             with st.spinner('正在处理中...'):
@@ -46,17 +101,63 @@ def main():
             remove_uploadfiles()
             st.success('删除成功')
 
-    elif choice == '制度匹配分析':
+    elif choice == '文件选择':
+        # choose radio for file1 or file2
+        file_choice = st.sidebar.radio('选择文件', ['选择文件1', '选择文件2'])
+        # initialize session value file1df, file1_embeddings
+        if 'file1df' not in st.session_state:
+            st.session_state['file1df'] = None
+        if 'file1_embeddings' not in st.session_state:
+            st.session_state['file1_embeddings'] = None
+        if 'file1_industry' not in st.session_state:
+            st.session_state['file1_industry'] = ''
+        if 'file1_rulechoice' not in st.session_state:
+            st.session_state['file1_rulechoice'] = []
+        if 'file1_filetype' not in st.session_state:
+            st.session_state['file1_filetype'] = ''
+        # initialize session value file2df, file2_embeddings
+        if 'file2df' not in st.session_state:
+            st.session_state['file2df'] = None
+        if 'file2_embeddings' not in st.session_state:
+            st.session_state['file2_embeddings'] = None
+        if 'file2_industry' not in st.session_state:
+            st.session_state['file2_industry'] = ''
+        if 'file2_rulechoice' not in st.session_state:
+            st.session_state['file2_rulechoice'] = []
+        if 'file2_filetype' not in st.session_state:
+            st.session_state['file2_filetype'] = ''
 
-        industry_list = get_folder_list(rulefolder)
-        industry_choice = st.sidebar.selectbox('选择行业:', industry_list)
-
-        if industry_choice != '':
+        if file_choice == '选择文件1':       
+            # get current file1 value from session
+            industry_choice = st.session_state['file1_industry']
+            rule_choice = st.session_state['file1_rulechoice']
+            filetype_choice = st.session_state['file1_filetype']
+        elif file_choice == '选择文件2':
+            # get current file2 value from session
+            industry_choice = st.session_state['file2_industry']
+            rule_choice = st.session_state['file2_rulechoice']
+            filetype_choice = st.session_state['file2_filetype']
+        # get preselected filetype index
+        file_typels=['外部制度', '已上传文件']
+        if filetype_choice == '':
+            filetype_index = 0
+        else:
+            filetype_index = file_typels.index(filetype_choice)
+        # choose file type
+        file_type = st.sidebar.selectbox('选择文件类型', ['外部制度', '已上传文件'], index=filetype_index,)
+        if file_type == '外部制度':
+            industry_list = get_folder_list(rulefolder)
+            # get preselected industry index
+            if industry_choice == '':
+                industry_index = 0
+                rule_choice = []
+            else:
+                industry_index = industry_list.index(industry_choice)
+            industry_choice = st.sidebar.selectbox('选择行业:', industry_list, index=industry_index)
+            
             name_text = ''
             rule_val, rule_list = searchByName(name_text, industry_choice)
-
-            rule_choice = st.sidebar.multiselect('选择匹配监管要求:', rule_list)
-
+            rule_choice = st.sidebar.multiselect('选择匹配监管要求:', rule_list, rule_choice)
             rule_section_list = get_section_list(rule_val, rule_choice)
             rule_column_ls = st.sidebar.multiselect('选择章节:', rule_section_list)
             if rule_column_ls == []:
@@ -64,212 +165,325 @@ def main():
             else:
                 column_rule = '|'.join(rule_column_ls)
 
-        upload_list = get_uploadfiles()
-        upload_choice = st.sidebar.multiselect('选择已上传文件:', upload_list)
+            if rule_choice != []:
+                ruledf, rule_embeddings = get_rule_data(rule_choice,
+                                                industry_choice)
+                choosedf, _ = searchByItem(ruledf, rule_choice, column_rule, '')
+                # get index of rule
+                rule_index = choosedf.index.tolist()
+                choose_embeddings = rule_embeddings[rule_index]
+            else:
+                choosedf, choose_embeddings = None, None
 
-        if (upload_choice != []) & (rule_choice != []):
-            uploaddf, upload_embeddings = get_upload_data(upload_choice)
+        elif file_type == '已上传文件':
+            if industry_choice != '':
+                rule_choice=[]
+            upload_list = get_uploadfiles()
+            upload_choice = st.sidebar.multiselect('选择已上传文件:', upload_list,rule_choice)
+            if upload_choice != []:
+                choosedf, choose_embeddings = get_upload_data(upload_choice)
+            else:
+                choosedf, choose_embeddings = None, None
+            industry_choice = ''
+            rule_choice = upload_choice
 
-            ruledf, rule_embeddings = get_rule_data(rule_choice,
-                                                    industry_choice)
+        # file choose button
+        file_button = st.sidebar.button('选择文件')
+        if file_button:
+            if file_choice == '选择文件1':
+                file1df, file1_embeddings = choosedf, choose_embeddings
+                file1_industry = industry_choice
+                file1_rulechoice = rule_choice
+                file1_filetype = file_type
+                st.session_state['file1df'] = choosedf
+                st.session_state['file1_embeddings'] = choose_embeddings
+                st.session_state['file1_industry'] = industry_choice
+                st.session_state['file1_rulechoice'] = rule_choice
+                st.session_state['file1_filetype'] = file_type
+                file2df= st.session_state['file2df']
+                file2_embeddings = st.session_state['file2_embeddings']
+                file2_industry = st.session_state['file2_industry']
+                file2_rulechoice = st.session_state['file2_rulechoice']
+                file2_filetype = st.session_state['file2_filetype']
+            elif file_choice == '选择文件2':
+                file2df, file2_embeddings = choosedf, choose_embeddings
+                file2_industry = industry_choice
+                file2_rulechoice = rule_choice
+                file2_filetype = file_type
+                st.session_state['file2df'] = choosedf
+                st.session_state['file2_embeddings'] = choose_embeddings
+                st.session_state['file2_industry'] = industry_choice
+                st.session_state['file2_rulechoice'] = rule_choice
+                st.session_state['file2_filetype'] = file_type
+                file1df = st.session_state['file1df']
+                file1_embeddings = st.session_state['file1_embeddings']
+                file1_industry = st.session_state['file1_industry']
+                file1_rulechoice = st.session_state['file1_rulechoice']
+                file1_filetype = st.session_state['file1_filetype']
+        else:
+            file1df= st.session_state['file1df']
+            file2df= st.session_state['file2df']
+            file1_embeddings = st.session_state['file1_embeddings']
+            file2_embeddings = st.session_state['file2_embeddings']
+            file1_industry = st.session_state['file1_industry']
+            file2_industry = st.session_state['file2_industry']
+            file1_rulechoice = st.session_state['file1_rulechoice']
+            file2_rulechoice = st.session_state['file2_rulechoice']
+            file1_filetype = st.session_state['file1_filetype']
+            file2_filetype = st.session_state['file2_filetype']
 
-            subruledf, _ = searchByItem(ruledf, rule_choice, column_rule, '')
+        st.write('已选择的文件：')
+        # display file1 rulechoice
+        if file1_rulechoice != []:
+            # convert to string
+            file1_rulechoice_str = '|'.join(file1_rulechoice)
+            # display string
+            st.warning('文件1：'+file1_rulechoice_str)
+        else:
+            st.error('文件1：无')
+        # display file2 rulechoice
+        if file2_rulechoice != []:
+            # convert to string
+            file2_rulechoice_str = '|'.join(file2_rulechoice)
+            # display string
+            st.warning('文件2：'+file2_rulechoice_str)
+        else:   
+            st.error('文件2：无')
+        # if file1df is None
+        # if file1df is None:
+        #     st.error('请选择文件1')
+        #     return
+        # if file2df is None:
+        #     st.error('请选择文件2')
+        #     return
+    
+    elif choice == '匹配分析':
+        file1df= st.session_state['file1df']
+        file2df= st.session_state['file2df']
+        file1_embeddings = st.session_state['file1_embeddings']
+        file2_embeddings = st.session_state['file2_embeddings']
+        file1_rulechoice = st.session_state['file1_rulechoice']
+        file2_rulechoice = st.session_state['file2_rulechoice']
 
-            # get index of rule
-            rule_index = subruledf.index.tolist()
-            subrule_embeddings = rule_embeddings[rule_index]
+        st.write('已选择的文件：')
+        # display file1 rulechoice
+        if file1_rulechoice != []:
+            # convert to string
+            file1_rulechoice_str = '|'.join(file1_rulechoice)
+            # display string
+            st.warning('文件1：'+file1_rulechoice_str)
+        else:
+            st.error('文件1：无')
+        # display file2 rulechoice
+        if file2_rulechoice != []:
+            # convert to string
+            file2_rulechoice_str = '|'.join(file2_rulechoice)
+            # display string
+            st.warning('文件2：'+file2_rulechoice_str)
+        else:   
+            st.error('文件2：无')
+        # if file1df is None
+        if file1df is None:
+            st.error('请选择文件1')
+            return
+        if file2df is None:
+            st.error('请选择文件2')
+            return
+  
+        match_method = st.sidebar.radio('匹配方法选择',
+                                        ('关键词匹配', '语义匹配'))
+        subruledf = file1df
+        subrule_embeddings = file1_embeddings
+        uploaddf= file2df
+        upload_embeddings = file2_embeddings
 
-            # choose match method
-            match_method = st.sidebar.radio('匹配方法选择',
-                                            ('关键词匹配', '语义匹配'))
+        if match_method == '关键词匹配':
+            # initialize session value proc_list
+            if 'proc_list' not in st.session_state:
+                st.session_state['proc_list'] = []
+            # initialize session value keyword_list
+            if 'keyword_list' not in st.session_state:
+                st.session_state['keyword_list'] = []
 
-            if match_method == '关键词匹配':
-                # initialize session value proc_list
-                if 'proc_list' not in st.session_state:
-                    st.session_state['proc_list'] = []
-                # initialize session value keyword_list
-                if 'keyword_list' not in st.session_state:
-                    st.session_state['keyword_list'] = []
+            # get proc_list
+            proc_list = subruledf['条款'].tolist()
+            # get length of proc_list
+            proc_len = len(proc_list)
 
-                # get proc_list
-                proc_list = subruledf['条款'].tolist()
-                # get length of proc_list
-                proc_len = len(proc_list)
-
-                # use expander
-                with st.sidebar.expander('参数设置'):
-                    # silidebar to choose key_num
-                    key_num = st.slider('选择关键词数量', 1, 10, 3)
-                    # get top number
-                    top_num = st.slider('选择匹配结果数量', 1, 10, 3)
-                    # get start index
-                    start_index = st.number_input('选择开始索引', 0, proc_len-1, 0)
-                    # convert to int
-                    start_index = int(start_index)
-                    # get end index
-                    end_index = st.number_input('选择结束索引', start_index,
-                                                proc_len-1, proc_len-1)
-                    # convert to int
-                    end_index = int(end_index)
-                    # match mode
-                    match_mode = st.radio('精确模式', ('精确', '模糊'))
-
-                # get keywords button
-                get_keywords_button = st.sidebar.button('获取关键词')
-                if get_keywords_button:
-                    # column_rule not empty
-                    if column_rule != '':
-                        proc_list = proc_list[start_index:end_index+1]
-                        # display proc_list
-                        st.write('匹配监管要求：')
-                        keywords_list = get_keywords(proc_list, key_num)
-                        # convert proc_list, keywords_list into dataframe and display
-                        proc_df = pd.DataFrame({'条款': proc_list, '关键词': keywords_list})
-                        st.table(proc_df)                       
-                        # display keywords_list
-                        # new_keywords_str = st.text_area(
-                        #     '关键词列表更新：', keywords_list)
-                        # # read literal new_keywords_str as raw string
-                        # new_keywords_list = ast.literal_eval(new_keywords_str)
-                        # update session value keyword_list
-                        st.session_state['keyword_list'] = keywords_list
-                        # update session value proc_list
-                        st.session_state['proc_list'] = proc_list
-                    else:
-                        st.error('请选择章节')
-                        keywords_list = []
-                        proc_list = []
+            # use expander
+            with st.sidebar.expander('参数设置'):
+                # silidebar to choose key_num
+                key_num = st.slider('选择关键词数量', 1, 10, 3)
+                # get top number
+                top_num = st.slider('选择匹配结果数量', 1, 10, 3)
+                # get start index
+                start_index = st.number_input('选择开始索引', 0, proc_len-1, 0,key='start_index')
+                # convert to int
+                start_index = int(start_index)
+                # get end index
+                end_index = st.number_input('选择结束索引', start_index,
+                                            proc_len-1, proc_len-1,key='end_index')
+                # convert to int
+                end_index = int(end_index)
+                # match mode
+                match_mode = st.radio('精确模式', ('精确', '模糊'))
+            st.subheader('关键词分析')
+            # get keywords button
+            get_keywords_button = st.sidebar.button('获取关键词')
+            if get_keywords_button:
+                # column_rule not empty
+                # if column_rule != '':
+                proc_list = proc_list[start_index:end_index+1]
+                # display proc_list
+                # st.write('匹配监管要求：')
+                keywords_list = get_keywords(proc_list, key_num)
+                # convert proc_list, keywords_list into dataframe and display
+                proc_df = pd.DataFrame({'条款': proc_list, '关键词': keywords_list})
+                st.table(proc_df)                       
+                # display keywords_list
+                # new_keywords_str = st.text_area(
+                #     '关键词列表更新：', keywords_list)
+                # # read literal new_keywords_str as raw string
+                # new_keywords_list = ast.literal_eval(new_keywords_str)
+                # update session value keyword_list
+                st.session_state['keyword_list'] = keywords_list
+                # update session value proc_list
+                st.session_state['proc_list'] = proc_list
+                # else:
+                #     st.error('请选择文件1章节')
+                #     keywords_list = []
+                #     proc_list = []
+            else:
+                keywords_list = st.session_state['keyword_list']
+                proc_list = st.session_state['proc_list']
+                proc_df = pd.DataFrame({'条款': proc_list, '关键词': keywords_list})
+                if proc_df.empty:
+                    st.error('请先点击获取关键词')
                 else:
-                    keywords_list = st.session_state['keyword_list']
-                    proc_list = st.session_state['proc_list']
-                    proc_df = pd.DataFrame({'条款': proc_list, '关键词': keywords_list})
-                    if proc_df.empty:
-                        st.error('请先点击获取关键词')
-                    else:
-                        st.table(proc_df)                       
+                    st.table(proc_df)                       
 
-                if keywords_list != []:
-                    # display keywords_list
-                    new_keywords_str = st.text_area(
-                        '关键词列表更新：', keywords_list)
-                    # read literal new_keywords_str as raw string
-                    new_keywords_list = ast.literal_eval(new_keywords_str)
-                    # update session value keyword_list
-                    st.session_state['keyword_list'] = new_keywords_list
-                else:
-                    new_keywords_list = []
-                 
-                # display button
-                submit = st.sidebar.button('开始匹配分析')
-                if submit:
-                    # # get keyword_list
-                    # new_keywords_list = st.session_state['keyword_list']
-                    # # get proc_list
-                    # proc_list = st.session_state['proc_list']
-                    st.subheader('匹配结果：')
-                    if match_mode == '精确':
-                        for i, (proc, keywords) in enumerate(
-                                zip(proc_list, new_keywords_list)):
-                            with st.spinner('正在处理中...'):
+            if keywords_list != []:
+                # display keywords_list
+                new_keywords_str = st.text_area(
+                    '关键词列表更新：', keywords_list)
+                # read literal new_keywords_str as raw string
+                new_keywords_list = ast.literal_eval(new_keywords_str)
+                # update session value keyword_list
+                st.session_state['keyword_list'] = new_keywords_list
+            else:
+                new_keywords_list = []
+                
+            # display button
+            submit = st.sidebar.button('开始匹配分析')
+            if submit:
+                # # get keyword_list
+                # new_keywords_list = st.session_state['keyword_list']
+                # # get proc_list
+                # proc_list = st.session_state['proc_list']
+                st.subheader('匹配结果：')
+                if match_mode == '精确':
+                    for i, (proc, keywords) in enumerate(
+                            zip(proc_list, new_keywords_list)):
+                        with st.spinner('正在处理中...'):
 
-                                st.warning('序号' + str(i + 1) + ': ' + proc)
-                                st.info('关键词: ' + '/'.join(keywords))
+                            st.warning('序号' + str(i + 1) + ': ' + proc)
+                            st.info('关键词: ' + '/'.join(keywords))
 
-                                subuploaddf = get_exect_similar(
-                                    uploaddf, keywords, top_num)
-                                # display result
-                                if subuploaddf.empty:
-                                    st.write('没有匹配结果')
-                                else:
-                                    st.table(subuploaddf)
-                                    st.write('-' * 20)
-
-                    elif match_mode == '模糊':
-                        audit_list = uploaddf['条款'].tolist()
-                        # get keywords list
-
-                        # display result
-                        for i, (proc, keywords) in enumerate(
-                                zip(proc_list, new_keywords_list)):
-                            with st.spinner('正在处理中...'):
-
-                                st.warning('序号' + str(i + 1) + ': ' + proc)
-                                st.info('关键词: ' + '/'.join(keywords))
-
-                                result = get_most_similar(
-                                    keywords, audit_list, top_num)
-
-                                # get subuploaddf based on index list
-                                subuploaddf = uploaddf.loc[result]
-                                # display result
+                            subuploaddf = get_exect_similar(
+                                uploaddf, keywords, top_num)
+                            # display result
+                            if subuploaddf.empty:
+                                st.write('没有匹配结果')
+                            else:
                                 st.table(subuploaddf)
                                 st.write('-' * 20)
 
-            elif match_method == '语义匹配':
-                # use expander
-                with st.sidebar.expander('参数设置'):
-                    top = st.slider('匹配数量选择',
-                                    min_value=1,
-                                    max_value=10,
-                                    value=2)
+                elif match_mode == '模糊':
+                    audit_list = uploaddf['条款'].tolist()
+                    # get keywords list
 
-                    x = st.slider('匹配阈值选择%',
-                                  min_value=0,
-                                  max_value=100,
-                                  value=80)
-                    st.write('匹配阈值:', x / 100)
-                    # review mode
-                    review_mode=st.radio('审阅模式', ('否', '是'))
+                    # display result
+                    for i, (proc, keywords) in enumerate(
+                            zip(proc_list, new_keywords_list)):
+                        with st.spinner('正在处理中...'):
 
-                if review_mode == '否':
-                    querydf, query_embeddings = subruledf, subrule_embeddings
-                    sentencedf, sentence_embeddings = uploaddf, upload_embeddings
+                            st.warning('序号' + str(i + 1) + ': ' + proc)
+                            st.info('关键词: ' + '/'.join(keywords))
 
-                elif review_mode == '是':
-                    querydf, query_embeddings = uploaddf, upload_embeddings
-                    sentencedf, sentence_embeddings = subruledf, subrule_embeddings
+                            result = get_most_similar(
+                                keywords, audit_list, top_num)
 
-                validdf = get_matchplc(querydf, query_embeddings, sentencedf,
-                                       sentence_embeddings, top)
-                combdf = pd.concat([querydf.reset_index(drop=True), validdf],
-                                   axis=1)
-                match = st.sidebar.radio('条款匹配分析条件', ('查看匹配条款', '查看不匹配条款'))
+                            # get subuploaddf based on index list
+                            subuploaddf = uploaddf.loc[result]
+                            # display result
+                            st.table(subuploaddf)
+                            st.write('-' * 20)
 
-                if match == '查看匹配条款':
-                    combdf['是否匹配'] = (combdf['匹配度'] >= x / 100).astype(int)
-                else:
-                    combdf['是否匹配'] = (combdf['匹配度'] < x / 100).astype(int)
+        elif match_method == '语义匹配':
+            # use expander
+            with st.sidebar.expander('参数设置'):
+                top = st.slider('匹配数量选择',
+                                min_value=1,
+                                max_value=10,
+                                value=2)
 
-                if review_mode == '否':
-                    do_plot_match(combdf, match)
+                x = st.slider('匹配阈值选择%',
+                                min_value=0,
+                                max_value=100,
+                                value=80)
+                st.write('匹配阈值:', x / 100)
+                # review mode
+                review_mode=st.radio('审阅模式', ('否', '是'))
 
-                sampledf = combdf.loc[
-                    combdf['是否匹配'] == 1,
-                    ['监管要求', '结构', '条款', '匹配条款', '匹配章节', '匹配制度', '匹配度']]
+            if review_mode == '否':
+                querydf, query_embeddings = subruledf, subrule_embeddings
+                sentencedf, sentence_embeddings = uploaddf, upload_embeddings
 
-                # st.sidebar.write('监管要求: ', '/'.join(rule_choice))
-                # st.sidebar.write('章节: ', column_rule)
-                # st.sidebar.write('内部制度: ', '/'.join(upload_choice))
+            elif review_mode == '是':
+                querydf, query_embeddings = uploaddf, upload_embeddings
+                sentencedf, sentence_embeddings = subruledf, subrule_embeddings
 
-                # calculate the percentage of matched items
-                matchrate = sampledf.shape[0] / combdf.shape[0]
-                st.sidebar.write('匹配率:', matchrate)
-                st.sidebar.write('总数:', sampledf.shape[0], '/',
-                                 combdf.shape[0])
+            validdf = get_matchplc(querydf, query_embeddings, sentencedf,
+                                    sentence_embeddings, top)
+            combdf = pd.concat([querydf.reset_index(drop=True), validdf],
+                                axis=1)
+            match = st.sidebar.radio('条款匹配分析条件', ('查看匹配条款', '查看不匹配条款'))
 
-                dis1ls, dis2ls, dis3ls = df2list(sampledf)
-                # enumerate each list with index
-                for i, (dis1, dis2,
-                        dis3) in enumerate(zip(dis1ls, dis2ls, dis3ls)):
-                    st.info('序号' + str(i + 1) + ': ' + dis1)
-                    st.warning(dis2)
-                    st.table(dis3)
-                # analysis is done
-                st.sidebar.success('分析完成')
-                st.sidebar.download_button(label='下载结果',
-                                           file_name='内外部合规分析结果.csv',
-                                           data=sampledf.to_csv(),
-                                           mime='text/csv')
+            if match == '查看匹配条款':
+                combdf['是否匹配'] = (combdf['匹配度'] >= x / 100).astype(int)
+            else:
+                combdf['是否匹配'] = (combdf['匹配度'] < x / 100).astype(int)
+
+            if review_mode == '否':
+                do_plot_match(combdf, match)
+
+            sampledf = combdf.loc[
+                combdf['是否匹配'] == 1,
+                ['监管要求', '结构', '条款', '匹配条款', '匹配章节', '匹配制度', '匹配度']]
+
+            # st.sidebar.write('监管要求: ', '/'.join(rule_choice))
+            # st.sidebar.write('章节: ', column_rule)
+            # st.sidebar.write('内部制度: ', '/'.join(upload_choice))
+
+            # calculate the percentage of matched items
+            matchrate = sampledf.shape[0] / combdf.shape[0]
+            st.sidebar.write('匹配率:', matchrate)
+            st.sidebar.write('总数:', sampledf.shape[0], '/',
+                                combdf.shape[0])
+
+            dis1ls, dis2ls, dis3ls = df2list(sampledf)
+            # enumerate each list with index
+            for i, (dis1, dis2,
+                    dis3) in enumerate(zip(dis1ls, dis2ls, dis3ls)):
+                st.info('序号' + str(i + 1) + ': ' + dis1)
+                st.warning(dis2)
+                st.table(dis3)
+            # analysis is done
+            st.sidebar.success('分析完成')
+            st.sidebar.download_button(label='下载结果',
+                                        file_name='内外部合规分析结果.csv',
+                                        data=sampledf.to_csv(),
+                                        mime='text/csv')
 
 
 if __name__ == '__main__':

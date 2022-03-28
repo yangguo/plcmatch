@@ -52,7 +52,7 @@ def get_matchplc(querydf, query_embeddings, sentencedf, sentence_embeddings,
 
 def do_plot_match(combdf, title):
 
-    combdf['章节'] = combdf['结构'].astype(str).str.extract('(.*?)/')
+    combdf['章节'] = combdf['结构'].astype(str).str.extract('([^\/]*)\/?')
     chartdb = combdf.groupby('章节',
                              sort=False)['是否匹配'].mean().reset_index(name='均值')
 
