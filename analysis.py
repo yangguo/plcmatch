@@ -13,6 +13,7 @@ def get_matchplc(querydf, query_embeddings, sentencedf, sentence_embeddings,
     answerlist = []
     policylist = []
     filelist = []
+    distlist=[]
     avglist = []
     number_top_matches = top
     for query, query_embedding in zip(queries, query_embeddings):
@@ -28,6 +29,7 @@ def get_matchplc(querydf, query_embeddings, sentencedf, sentence_embeddings,
         itemlist = []
         plclist = []
         filist = []
+        disls=[]
         avg = 0
         for idx, distance in results[0:number_top_matches]:
             ansstr = sentences[idx].strip()
@@ -36,16 +38,19 @@ def get_matchplc(querydf, query_embeddings, sentencedf, sentence_embeddings,
             itemlist.append(ansstr)
             plclist.append(plcstr)
             filist.append(filestr)
+            disls.append(1-distance)
             avg += (1 - distance)
         answerlist.append(itemlist)
         policylist.append(plclist)
         filelist.append(filist)
+        distlist.append(disls)
         avglist.append(avg / number_top_matches)
     resdata['query'] = querylist
     resdata['匹配条款'] = answerlist
     resdata['匹配章节'] = policylist
     resdata['匹配制度'] = filelist
-    resdata['匹配度'] = avglist
+    resdata['匹配度'] = distlist
+    resdata['平均匹配度'] = avglist
     resdf = pd.DataFrame(resdata)
     return resdf
 
@@ -78,25 +83,27 @@ def df2list(df):
     # dis1
     dis1 = []
     dis2 = []
-    dfdis1 = df[['监管要求', '结构', '条款', '匹配度']]
+    dfdis1 = df[['监管要求', '结构', '条款', '平均匹配度']]
     # conver each df row to df list
     for index, row in dfdis1.iterrows():
         # conver row to str
         rowstr1 = str(row[0]) + ' /' + str(row[1])
-        rowstr2 = ' 条款:' + str(row[2]) + ' [匹配度:' + str(row[3]) + ']'
+        rowstr2 = ' 条款:' + str(row[2]) + ' [平均匹配度:' + str(row[3]) + ']'
         dis1.append(rowstr1)
         dis2.append(rowstr2)
     # dis3
     plcls = df['匹配条款'].tolist()
     sectionls = df['匹配章节'].tolist()
     filels = df['匹配制度'].tolist()
+    disls=df['匹配度'].tolist()
 
     dis3 = []
-    for plc, section, file in zip(plcls, sectionls, filels):
+    for plc, section, file,dist in zip(plcls, sectionls, filels,disls):
         content = {}
         content['匹配制度'] = file
         content['匹配章节'] = section
         content['匹配条款'] = plc
+        content['匹配度'] = dist
         df = pd.DataFrame(content)
         dis3.append(df)
 

@@ -450,16 +450,16 @@ def main():
             match = st.sidebar.radio('条款匹配分析条件', ('查看匹配条款', '查看不匹配条款'))
 
             if match == '查看匹配条款':
-                combdf['是否匹配'] = (combdf['匹配度'] >= x / 100).astype(int)
+                combdf['是否匹配'] = (combdf['平均匹配度'] >= x / 100).astype(int)
             else:
-                combdf['是否匹配'] = (combdf['匹配度'] < x / 100).astype(int)
+                combdf['是否匹配'] = (combdf['平均匹配度'] < x / 100).astype(int)
 
             if review_mode == '否':
                 do_plot_match(combdf, match)
 
             sampledf = combdf.loc[
                 combdf['是否匹配'] == 1,
-                ['监管要求', '结构', '条款', '匹配条款', '匹配章节', '匹配制度', '匹配度']]
+                ['监管要求', '结构', '条款', '匹配条款', '匹配章节', '匹配制度', '匹配度','平均匹配度']]
 
             # st.sidebar.write('监管要求: ', '/'.join(rule_choice))
             # st.sidebar.write('章节: ', column_rule)
