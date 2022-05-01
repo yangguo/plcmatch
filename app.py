@@ -4,8 +4,10 @@ import ast
 
 from analysis import get_matchplc, do_plot_match, df2list
 from checkrule import searchByName, searchByItem, get_rule_data
-from utils import get_folder_list, get_section_list, get_most_similar, get_keywords, get_exect_similar
+from utils import get_folder_list, get_section_list, get_most_similar, get_keywords, get_exect_similar,df2aggrid
 from upload import save_uploadedfile, upload_data, get_uploadfiles, remove_uploadfiles, get_upload_data,savedf
+# Import for dyanmic tagging
+from streamlit_tags import st_tags, st_tags_sidebar
 
 rulefolder = 'rules'
 
@@ -15,6 +17,34 @@ def main():
     # st.subheader("制度匹配分析")
     menu = ['文件上传','文件选择', '匹配分析']
     choice = st.sidebar.selectbox("选择", menu)
+
+    # initialize session value file1df, file1_embeddings
+    if 'file1df' not in st.session_state:
+        st.session_state['file1df'] = None
+    if 'file1_embeddings' not in st.session_state:
+        st.session_state['file1_embeddings'] = None
+    if 'file1_industry' not in st.session_state:
+        st.session_state['file1_industry'] = ''
+    if 'file1_rulechoice' not in st.session_state:
+        st.session_state['file1_rulechoice'] = []
+    if 'file1_filetype' not in st.session_state:
+        st.session_state['file1_filetype'] = ''
+    if 'file1_section_list' not in st.session_state:
+        st.session_state['file1_section_list'] = []
+    # initialize session value file2df, file2_embeddings
+    if 'file2df' not in st.session_state:
+        st.session_state['file2df'] = None
+    if 'file2_embeddings' not in st.session_state:
+        st.session_state['file2_embeddings'] = None
+    if 'file2_industry' not in st.session_state:
+        st.session_state['file2_industry'] = ''
+    if 'file2_rulechoice' not in st.session_state:
+        st.session_state['file2_rulechoice'] = []
+    if 'file2_filetype' not in st.session_state:
+        st.session_state['file2_filetype'] = ''
+    if 'file2_section_list' not in st.session_state:
+        st.session_state['file2_section_list'] = []
+
     if choice == '文件上传':
         uploaded_file_ls = st.file_uploader("选择新文件上传",
                                             type=['docx', 'pdf', 'txt','xlsx'],
@@ -104,39 +134,19 @@ def main():
     elif choice == '文件选择':
         # choose radio for file1 or file2
         file_choice = st.sidebar.radio('选择文件', ['选择文件1', '选择文件2'])
-        # initialize session value file1df, file1_embeddings
-        if 'file1df' not in st.session_state:
-            st.session_state['file1df'] = None
-        if 'file1_embeddings' not in st.session_state:
-            st.session_state['file1_embeddings'] = None
-        if 'file1_industry' not in st.session_state:
-            st.session_state['file1_industry'] = ''
-        if 'file1_rulechoice' not in st.session_state:
-            st.session_state['file1_rulechoice'] = []
-        if 'file1_filetype' not in st.session_state:
-            st.session_state['file1_filetype'] = ''
-        # initialize session value file2df, file2_embeddings
-        if 'file2df' not in st.session_state:
-            st.session_state['file2df'] = None
-        if 'file2_embeddings' not in st.session_state:
-            st.session_state['file2_embeddings'] = None
-        if 'file2_industry' not in st.session_state:
-            st.session_state['file2_industry'] = ''
-        if 'file2_rulechoice' not in st.session_state:
-            st.session_state['file2_rulechoice'] = []
-        if 'file2_filetype' not in st.session_state:
-            st.session_state['file2_filetype'] = ''
 
         if file_choice == '选择文件1':       
             # get current file1 value from session
             industry_choice = st.session_state['file1_industry']
             rule_choice = st.session_state['file1_rulechoice']
             filetype_choice = st.session_state['file1_filetype']
+            section_choice = st.session_state['file1_section_list']
         elif file_choice == '选择文件2':
             # get current file2 value from session
             industry_choice = st.session_state['file2_industry']
             rule_choice = st.session_state['file2_rulechoice']
             filetype_choice = st.session_state['file2_filetype']
+            section_choice = st.session_state['file2_section_list']
         # get preselected filetype index
         file_typels=['外部制度', '已上传文件']
         if filetype_choice == '':
@@ -159,7 +169,7 @@ def main():
             rule_val, rule_list = searchByName(name_text, industry_choice)
             rule_choice = st.sidebar.multiselect('选择匹配监管要求:', rule_list, rule_choice)
             rule_section_list = get_section_list(rule_val, rule_choice)
-            rule_column_ls = st.sidebar.multiselect('选择章节:', rule_section_list)
+            rule_column_ls = st.sidebar.multiselect('选择章节:', rule_section_list,section_choice)
             if rule_column_ls == []:
                 column_rule = ''
             else:
@@ -186,6 +196,7 @@ def main():
                 choosedf, choose_embeddings = None, None
             industry_choice = ''
             rule_choice = upload_choice
+            rule_column_ls = []
 
         # file choose button
         file_button = st.sidebar.button('选择文件')
@@ -195,31 +206,37 @@ def main():
                 file1_industry = industry_choice
                 file1_rulechoice = rule_choice
                 file1_filetype = file_type
-                st.session_state['file1df'] = choosedf
-                st.session_state['file1_embeddings'] = choose_embeddings
-                st.session_state['file1_industry'] = industry_choice
-                st.session_state['file1_rulechoice'] = rule_choice
-                st.session_state['file1_filetype'] = file_type
+                file1_section_list = rule_column_ls
+                st.session_state['file1df'] = file1df
+                st.session_state['file1_embeddings'] = file1_embeddings
+                st.session_state['file1_industry'] = file1_industry
+                st.session_state['file1_rulechoice'] = file1_rulechoice
+                st.session_state['file1_filetype'] = file1_filetype
+                st.session_state['file1_section_list'] = file1_section_list
                 file2df= st.session_state['file2df']
                 file2_embeddings = st.session_state['file2_embeddings']
                 file2_industry = st.session_state['file2_industry']
                 file2_rulechoice = st.session_state['file2_rulechoice']
                 file2_filetype = st.session_state['file2_filetype']
+                file2_section_list = st.session_state['file2_section_list']
             elif file_choice == '选择文件2':
                 file2df, file2_embeddings = choosedf, choose_embeddings
                 file2_industry = industry_choice
                 file2_rulechoice = rule_choice
                 file2_filetype = file_type
-                st.session_state['file2df'] = choosedf
-                st.session_state['file2_embeddings'] = choose_embeddings
-                st.session_state['file2_industry'] = industry_choice
-                st.session_state['file2_rulechoice'] = rule_choice
-                st.session_state['file2_filetype'] = file_type
+                file2_section_list = rule_column_ls
+                st.session_state['file2df'] = file2df
+                st.session_state['file2_embeddings'] = file2_embeddings
+                st.session_state['file2_industry'] = file2_industry
+                st.session_state['file2_rulechoice'] = file2_rulechoice
+                st.session_state['file2_filetype'] = file2_filetype
+                st.session_state['file2_section_list'] = file2_section_list
                 file1df = st.session_state['file1df']
                 file1_embeddings = st.session_state['file1_embeddings']
                 file1_industry = st.session_state['file1_industry']
                 file1_rulechoice = st.session_state['file1_rulechoice']
                 file1_filetype = st.session_state['file1_filetype']
+                file1_section_list = st.session_state['file1_section_list']
         else:
             file1df= st.session_state['file1df']
             file2df= st.session_state['file2df']
@@ -231,32 +248,46 @@ def main():
             file2_rulechoice = st.session_state['file2_rulechoice']
             file1_filetype = st.session_state['file1_filetype']
             file2_filetype = st.session_state['file2_filetype']
+            file1_section_list = st.session_state['file1_section_list']
+            file2_section_list = st.session_state['file2_section_list']
 
-        st.write('已选择的文件：')
+        st.subheader('已选择的文件1：')
         # display file1 rulechoice
         if file1_rulechoice != []:
             # convert to string
-            file1_rulechoice_str = '|'.join(file1_rulechoice)
+            file1_rulechoice_str = '| '.join(file1_rulechoice)
             # display string
             st.warning('文件1：'+file1_rulechoice_str)
         else:
             st.error('文件1：无')
+        # display file1 section
+        if file1_section_list != []:
+            # convert to string
+            file1_section_str = '| '.join(file1_section_list)
+            # display string
+            st.info('章节1：'+file1_section_str)
+        else:
+            st.info('章节1：全部')
+
+        st.subheader('已选择的文件2：')
         # display file2 rulechoice
         if file2_rulechoice != []:
             # convert to string
-            file2_rulechoice_str = '|'.join(file2_rulechoice)
+            file2_rulechoice_str = '| '.join(file2_rulechoice)
             # display string
             st.warning('文件2：'+file2_rulechoice_str)
         else:   
             st.error('文件2：无')
-        # if file1df is None
-        # if file1df is None:
-        #     st.error('请选择文件1')
-        #     return
-        # if file2df is None:
-        #     st.error('请选择文件2')
-        #     return
-    
+
+        # display file2 section
+        if file2_section_list != []:
+            # convert to string
+            file2_section_str = '| '.join(file2_section_list)
+            # display string
+            st.info('章节2：'+file2_section_str)
+        else:
+            st.info('章节2：全部')
+
     elif choice == '匹配分析':
         file1df= st.session_state['file1df']
         file2df= st.session_state['file2df']
@@ -264,24 +295,45 @@ def main():
         file2_embeddings = st.session_state['file2_embeddings']
         file1_rulechoice = st.session_state['file1_rulechoice']
         file2_rulechoice = st.session_state['file2_rulechoice']
+        file1_section_list = st.session_state['file1_section_list']
+        file2_section_list = st.session_state['file2_section_list']
 
-        st.write('已选择的文件：')
+        st.subheader('已选择的文件：')
         # display file1 rulechoice
         if file1_rulechoice != []:
             # convert to string
-            file1_rulechoice_str = '|'.join(file1_rulechoice)
+            file1_rulechoice_str = '| '.join(file1_rulechoice)
             # display string
             st.warning('文件1：'+file1_rulechoice_str)
         else:
             st.error('文件1：无')
+        # display file1 section
+        if file1_section_list != []:
+            # convert to string
+            file1_section_str = '| '.join(file1_section_list)
+            # display string
+            st.info('章节1：'+file1_section_str)
+        else:
+            st.info('章节1：全部')
+
         # display file2 rulechoice
         if file2_rulechoice != []:
             # convert to string
-            file2_rulechoice_str = '|'.join(file2_rulechoice)
+            file2_rulechoice_str = '| '.join(file2_rulechoice)
             # display string
             st.warning('文件2：'+file2_rulechoice_str)
         else:   
             st.error('文件2：无')
+
+        # display file2 section
+        if file2_section_list != []:
+            # convert to string
+            file2_section_str = '| '.join(file2_section_list)
+            # display string
+            st.info('章节2：'+file2_section_str)
+        else:
+            st.info('章节2：全部')
+
         # if file1df is None
         if file1df is None:
             st.error('请选择文件1')
@@ -291,7 +343,7 @@ def main():
             return
   
         match_method = st.sidebar.radio('匹配方法选择',
-                                        ('关键词匹配', '语义匹配'))
+                                        ( '语义匹配','关键词匹配'))
         subruledf = file1df
         subrule_embeddings = file1_embeddings
         uploaddf= file2df
@@ -331,53 +383,68 @@ def main():
             # get keywords button
             get_keywords_button = st.sidebar.button('获取关键词')
             if get_keywords_button:
-                # column_rule not empty
-                # if column_rule != '':
                 proc_list = proc_list[start_index:end_index+1]
-                # display proc_list
-                # st.write('匹配监管要求：')
-                keywords_list = get_keywords(proc_list, key_num)
-                # convert proc_list, keywords_list into dataframe and display
-                proc_df = pd.DataFrame({'条款': proc_list, '关键词': keywords_list})
-                st.table(proc_df)                       
-                # display keywords_list
-                # new_keywords_str = st.text_area(
-                #     '关键词列表更新：', keywords_list)
-                # # read literal new_keywords_str as raw string
-                # new_keywords_list = ast.literal_eval(new_keywords_str)
+                keywords_list = get_keywords(proc_list, key_num) 
                 # update session value keyword_list
                 st.session_state['keyword_list'] = keywords_list
                 # update session value proc_list
                 st.session_state['proc_list'] = proc_list
-                # else:
-                #     st.error('请选择文件1章节')
-                #     keywords_list = []
-                #     proc_list = []
             else:
                 keywords_list = st.session_state['keyword_list']
                 proc_list = st.session_state['proc_list']
-                proc_df = pd.DataFrame({'条款': proc_list, '关键词': keywords_list})
-                if proc_df.empty:
-                    st.error('请先点击获取关键词')
-                else:
-                    st.table(proc_df)                       
+            
+            proc_df = pd.DataFrame({'条款': proc_list, '关键词': keywords_list})
+            # add index new column
+            proc_df['序号'] = proc_df.index
+            
+            if proc_df.empty:
+                st.error('请先点击获取关键词')
+                st.stop()
 
-            if keywords_list != []:
-                # display keywords_list
-                new_keywords_str = st.text_area(
-                    '关键词列表更新：', keywords_list)
-                # read literal new_keywords_str as raw string
-                new_keywords_list = ast.literal_eval(new_keywords_str)
+            # st.table(proc_df) 
+            select_df=df2aggrid(proc_df)  
+            selected_rows = select_df["selected_rows"]
+            if selected_rows==[]:
+                st.error('请先选择查看的条款')
+                st.stop()
+            # get proc
+            select_proc = selected_rows[0]['条款']
+            # get keyword
+            select_keyword = selected_rows[0]['关键词']
+            # convert to list
+            select_keyword =  ast.literal_eval(select_keyword)
+            # get index
+            select_index = selected_rows[0]['序号']
+            # update keyword_list
+            keyword_update = st_tags(
+                label='### 关键词更新',
+                text='按回车键添加关键词',
+                value=select_keyword,
+                suggestions=select_keyword,
+                maxtags = key_num
+                )
+            # display select_proc
+            st.write('选择的条款：'+select_proc)
+            # convert list to string
+            select_keyword_str = '| '.join(select_keyword)
+            # display select_keyword
+            st.write('原关键词列表：'+select_keyword_str)
+            
+            # add update keyword button
+            update_keyword_button = st.button('更新关键词')
+            if update_keyword_button:
+                # update keywords_list by index
+                keywords_list[select_index] = keyword_update
                 # update session value keyword_list
-                st.session_state['keyword_list'] = new_keywords_list
-            else:
-                new_keywords_list = []
-                
+                st.session_state['keyword_list'] = keywords_list
+                # rerun page
+                st.experimental_rerun()
+
             # display button
             submit = st.sidebar.button('开始匹配分析')
             if submit:
                 # # get keyword_list
-                # new_keywords_list = st.session_state['keyword_list']
+                new_keywords_list = st.session_state['keyword_list']
                 # # get proc_list
                 # proc_list = st.session_state['proc_list']
                 st.subheader('匹配结果：')
@@ -461,15 +528,15 @@ def main():
                 combdf['是否匹配'] == 1,
                 ['监管要求', '结构', '条款', '匹配条款', '匹配章节', '匹配制度', '匹配度','平均匹配度']]
 
-            # st.sidebar.write('监管要求: ', '/'.join(rule_choice))
-            # st.sidebar.write('章节: ', column_rule)
-            # st.sidebar.write('内部制度: ', '/'.join(upload_choice))
 
             # calculate the percentage of matched items
             matchrate = sampledf.shape[0] / combdf.shape[0]
-            st.sidebar.write('匹配率:', matchrate)
-            st.sidebar.write('总数:', sampledf.shape[0], '/',
-                                combdf.shape[0])
+            # format the percentage
+            matchrate = '{:.2%}'.format(matchrate)
+            st.sidebar.metric('匹配率:', matchrate)
+            # total number of matched items
+            totalstr=str(sampledf.shape[0])+'/'+str(combdf.shape[0])
+            st.sidebar.metric('匹配条款总数:', totalstr)
 
             dis1ls, dis2ls, dis3ls = df2list(sampledf)
             # enumerate each list with index
