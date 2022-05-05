@@ -405,40 +405,41 @@ def main():
             select_df=df2aggrid(proc_df)  
             selected_rows = select_df["selected_rows"]
             if selected_rows==[]:
-                st.error('请先选择查看的条款')
-                st.stop()
-            # get proc
-            select_proc = selected_rows[0]['条款']
-            # get keyword
-            select_keyword = selected_rows[0]['关键词']
-            # convert to list
-            select_keyword =  ast.literal_eval(select_keyword)
-            # get index
-            select_index = selected_rows[0]['序号']
-            # update keyword_list
-            keyword_update = st_tags(
-                label='### 关键词更新',
-                text='按回车键添加关键词',
-                value=select_keyword,
-                suggestions=select_keyword,
-                maxtags = key_num
-                )
-            # display select_proc
-            st.write('选择的条款：'+select_proc)
-            # convert list to string
-            select_keyword_str = '| '.join(select_keyword)
-            # display select_keyword
-            st.write('原关键词列表：'+select_keyword_str)
-            
-            # add update keyword button
-            update_keyword_button = st.button('更新关键词')
-            if update_keyword_button:
-                # update keywords_list by index
-                keywords_list[select_index] = keyword_update
-                # update session value keyword_list
-                st.session_state['keyword_list'] = keywords_list
-                # rerun page
-                st.experimental_rerun()
+                st.error('选择条款更新关键词')
+                # st.stop()
+            else:
+                # get proc
+                select_proc = selected_rows[0]['条款']
+                # get keyword
+                select_keyword = selected_rows[0]['关键词']
+                # convert to list
+                select_keyword =  ast.literal_eval(select_keyword)
+                # get index
+                select_index = selected_rows[0]['序号']
+                # update keyword_list
+                keyword_update = st_tags(
+                    label='### 关键词更新',
+                    text='按回车键添加关键词',
+                    value=select_keyword,
+                    suggestions=select_keyword,
+                    maxtags = key_num
+                    )
+                # display select_proc
+                st.write('选择的条款：'+select_proc)
+                # convert list to string
+                select_keyword_str = '| '.join(select_keyword)
+                # display select_keyword
+                st.write('原关键词列表：'+select_keyword_str)
+                
+                # add update keyword button
+                update_keyword_button = st.button('更新关键词')
+                if update_keyword_button:
+                    # update keywords_list by index
+                    keywords_list[select_index] = keyword_update
+                    # update session value keyword_list
+                    st.session_state['keyword_list'] = keywords_list
+                    # rerun page
+                    st.experimental_rerun()
 
             # display button
             submit = st.sidebar.button('开始匹配分析')
