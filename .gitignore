@@ -135,3 +135,9 @@ dmypy.json
 .VSCodeCounter
 .vscode
 uploads
+data
+.flake8
+.trunk
+.hadolint.yaml
+.isort.cfg
+.markdownlint.yaml
