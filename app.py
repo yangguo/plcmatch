@@ -1,6 +1,5 @@
 import ast
-from nbformat import write
-
+import io
 import pandas as pd
 import streamlit as st
 
@@ -8,7 +7,7 @@ import streamlit as st
 from streamlit_tags import st_tags, st_tags_sidebar
 
 from analysis import df2list, do_plot_match, get_matchplc
-from checkaudit import searchauditByItem, searchauditByName,get_sampleaudit
+from checkaudit import searchauditByItem, searchauditByName, get_sampleaudit
 from checkrule import get_rule_data, searchByItem, searchByName
 from upload import (
     get_upload_data,
@@ -67,85 +66,109 @@ def main():
         st.session_state["file2_section_list"] = []
 
     if choice == "文件上传":
-        uploaded_file_ls = st.file_uploader(
-            "选择新文件上传",
-            type=["docx", "pdf", "txt", "xlsx"],
-            accept_multiple_files=True,
-            help="选择文件上传",
-        )
+        # choose input method of manual or upload file
+        input_method = st.sidebar.radio("文件上传方式", ("手动输入", "上传文件"))
 
-        for uploaded_file in uploaded_file_ls:
-            if uploaded_file is not None:
+        if input_method == "手动输入":
+            file_name = st.text_input("请输入文件名称")
+            file_text = st.text_area("请输入文件内容")
+            # save txt file as bytesio
+            if file_name != "" and file_text != "":
+                file_bytes = bytes(file_text, encoding="utf8")
+                file_io = io.BytesIO(file_bytes)
+                file_io.name = file_name + ".txt"
+                # save button
+                filesave = st.button("保存文件")
+                if filesave:
+                    save_uploadedfile(file_io)
+                    # st.success('文件保存成功')
+            else:
+                st.error("请输入文件名称和内容")
 
-                # Check File Type
-                if (
-                    (
+        elif input_method == "上传文件":
+            uploaded_file_ls = st.file_uploader(
+                "选择新文件上传",
+                type=["docx", "pdf", "txt", "xlsx"],
+                accept_multiple_files=True,
+                help="选择文件上传",
+            )
+
+            for uploaded_file in uploaded_file_ls:
+                if uploaded_file is not None:
+
+                    # Check File Type
+                    if (
+                        (
+                            uploaded_file.type
+                            == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        )
+                        | (uploaded_file.type == "application/pdf")
+                        | (uploaded_file.type == "text/plain")
+                    ):
+                        save_uploadedfile(uploaded_file)
+
+                        # if upload file is xlsx
+                    elif (
                         uploaded_file.type
-                        == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    )
-                    | (uploaded_file.type == "application/pdf")
-                    | (uploaded_file.type == "text/plain")
-                ):
-                    save_uploadedfile(uploaded_file)
+                        == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    ):
+                        # get sheet names list from excel file
+                        xls = pd.ExcelFile(uploaded_file)
+                        sheets = xls.sheet_names
+                        # choose sheet name and click button
+                        sheet_name = st.selectbox("选择表单", sheets)
 
-                    # if upload file is xlsx
-                elif (
-                    uploaded_file.type
-                    == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                ):
-                    # get sheet names list from excel file
-                    xls = pd.ExcelFile(uploaded_file)
-                    sheets = xls.sheet_names
-                    # choose sheet name and click button
-                    sheet_name = st.selectbox("选择表单", sheets)
+                        # choose header row
+                        header_row = st.number_input(
+                            "选择表头行",
+                            min_value=0,
+                            max_value=10,
+                            value=0,
+                            key="header_row",
+                        )
+                        df = pd.read_excel(
+                            uploaded_file, header=header_row, sheet_name=sheet_name
+                        )
+                        # filllna
+                        df = df.fillna("")
+                        # display the first five rows
+                        st.write(df.astype(str))
 
-                    # choose header row
-                    header_row = st.number_input(
-                        "选择表头行", min_value=0, max_value=10, value=0, key="header_row"
-                    )
-                    df = pd.read_excel(
-                        uploaded_file, header=header_row, sheet_name=sheet_name
-                    )
-                    # filllna
-                    df = df.fillna("")
-                    # display the first five rows
-                    st.write(df.astype(str))
+                        # get df columns
+                        cols = df.columns
+                        # choose proc_text and audit_text column
+                        proc_col = st.sidebar.selectbox("选择文本列", cols)
 
-                    # get df columns
-                    cols = df.columns
-                    # choose proc_text and audit_text column
-                    proc_col = st.sidebar.selectbox("选择文本列", cols)
+                        # get proc_text and audit_text list
+                        proc_list = df[proc_col].tolist()
 
-                    # get proc_text and audit_text list
-                    proc_list = df[proc_col].tolist()
+                        # get proc_list and audit_list length
+                        proc_len = len(proc_list)
 
-                    # get proc_list and audit_list length
-                    proc_len = len(proc_list)
+                        # if proc_list or audit_list is empty or not equal
+                        if proc_len == 0:
+                            st.error("文本列为空，请重新选择")
+                            return
+                        else:
+                            # choose start and end index
+                            start_idx = st.sidebar.number_input(
+                                "选择开始索引", min_value=0, max_value=proc_len - 1, value=0
+                            )
+                            end_idx = st.sidebar.number_input(
+                                "选择结束索引",
+                                min_value=start_idx,
+                                max_value=proc_len - 1,
+                                value=proc_len - 1,
+                            )
+                            # get proc_list and audit_list
+                            subproc_list = proc_list[start_idx : end_idx + 1]
+                            # get basename of uploaded file
+                            basename = uploaded_file.name.split(".")[0]
+                            # save subproc_list to file using upload
+                            savedf(subproc_list, basename)
 
-                    # if proc_list or audit_list is empty or not equal
-                    if proc_len == 0:
-                        st.error("文本列为空，请重新选择")
-                        return
                     else:
-                        # choose start and end index
-                        start_idx = st.sidebar.number_input(
-                            "选择开始索引", min_value=0, max_value=proc_len - 1, value=0
-                        )
-                        end_idx = st.sidebar.number_input(
-                            "选择结束索引",
-                            min_value=start_idx,
-                            max_value=proc_len - 1,
-                            value=proc_len - 1,
-                        )
-                        # get proc_list and audit_list
-                        subproc_list = proc_list[start_idx : end_idx + 1]
-                        # get basename of uploaded file
-                        basename = uploaded_file.name.split(".")[0]
-                        # save subproc_list to file using upload
-                        savedf(subproc_list, basename)
-
-                else:
-                    st.error("不支持文件类型")
+                        st.error("不支持文件类型")
 
         submit = st.button("文件编码")
         if submit:
@@ -264,7 +287,9 @@ def main():
                     emblist = ruledf["监管要求"].unique().tolist()
                     subsearchdf = get_sampleaudit(emblist, industry_choice)
                     # fix index
-                    choosedf, _ = searchauditByItem(subsearchdf, emblist, column_text, "", "", "")
+                    choosedf, _ = searchauditByItem(
+                        subsearchdf, emblist, column_text, "", "", ""
+                    )
                     # get index of the rule
                     ruledf_index = choosedf.index.tolist()
                     choosefolder = get_auditfolder(industry_choice)
@@ -597,22 +622,29 @@ def main():
                 sentencedf, sentence_embeddings = subruledf, subrule_embeddings
 
             validdf = get_matchplc(
-                querydf, query_embeddings, sentencedf, sentence_embeddings, top
+                querydf, query_embeddings, sentencedf, sentence_embeddings, top,x / 100
             )
             combdf = pd.concat([querydf.reset_index(drop=True), validdf], axis=1)
             match = st.sidebar.radio("条款匹配分析条件", ("查看匹配条款", "查看不匹配条款"))
-
+            st.write(combdf)
             if match == "查看匹配条款":
-                combdf["是否匹配"] = (combdf["平均匹配度"] >= x / 100).astype(int)
+                # combdf["是否匹配"] = (combdf["平均匹配度"] >= x / 100).astype(int)
+                # get maximum value from list
+                combdf["是否匹配"] = combdf["匹配状态"].apply(lambda x: max(x))
+                flag=1
             else:
-                combdf["是否匹配"] = (combdf["平均匹配度"] < x / 100).astype(int)
+                # combdf["是否匹配"] = (combdf["平均匹配度"] < x / 100).astype(int)
+                combdf["是否匹配"] = (combdf["匹配状态"].apply(lambda x: max(x))==0)
+                flag=0
+
+
 
             if review_mode == "否":
                 do_plot_match(combdf, match)
 
             sampledf = combdf.loc[
                 combdf["是否匹配"] == 1,
-                ["监管要求", "结构", "条款", "匹配条款", "匹配章节", "匹配制度", "匹配度", "平均匹配度"],
+                ["监管要求", "结构", "条款", "匹配条款", "匹配章节", "匹配制度", "匹配度", "匹配状态"],
             ]
 
             # calculate the percentage of matched items
@@ -624,7 +656,7 @@ def main():
             totalstr = str(sampledf.shape[0]) + "/" + str(combdf.shape[0])
             st.sidebar.metric("匹配条款总数:", totalstr)
 
-            dis1ls, dis2ls, dis3ls = df2list(sampledf)
+            dis1ls, dis2ls, dis3ls = df2list(sampledf, flag)
             # enumerate each list with index
             for i, (dis1, dis2, dis3) in enumerate(zip(dis1ls, dis2ls, dis3ls)):
                 st.info("序号" + str(i + 1) + ": " + dis1)

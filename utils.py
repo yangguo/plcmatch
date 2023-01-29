@@ -95,7 +95,7 @@ def roformer_encoder(sentences):
     return sentence_embeddings
 
 
-@st.cache
+# @st.cache
 def get_csvdf(rulefolder):
     files2 = glob.glob(rulefolder + "**/*.csv", recursive=True)
     dflist = []
