@@ -48,8 +48,8 @@ async def sent2emb(sents):
     embls = []
     for sent in sents:
         # get summary of sent
-        summarize = get_summary(sent)
-        sentence_embedding = roformer_encoder(summarize)
+        # summarize = get_summary(sent)
+        sentence_embedding = roformer_encoder(sent)
         embls.append(sentence_embedding)
     all_embeddings = np.concatenate(embls)
     return all_embeddings

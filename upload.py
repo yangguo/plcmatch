@@ -13,7 +13,7 @@ uploadfolder = 'uploads'
 
 
 def get_uploadfiles():
-    fileslist = glob.glob(uploadfolder + '/*.csv', recursive=True)
+    fileslist = glob.glob(uploadfolder + '/*.npy', recursive=True)
     filenamels = []
     for filepath in fileslist:
         filename = os.path.basename(filepath)

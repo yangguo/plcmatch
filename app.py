@@ -365,6 +365,28 @@ def main():
             file1_section_list = st.session_state["file1_section_list"]
             file2_section_list = st.session_state["file2_section_list"]
 
+        # file choose reset
+        file_reset = st.sidebar.button("重置文件")
+        if file_reset:
+            file1df, file2df = None, None
+            file1_embeddings, file2_embeddings = None, None
+            file1_industry, file2_industry = "", ""
+            file1_rulechoice, file2_rulechoice = [], []
+            file1_filetype, file2_filetype = "", ""
+            file1_section_list, file2_section_list = [], []
+            st.session_state["file1df"] = file1df
+            st.session_state["file2df"] = file2df
+            st.session_state["file1_embeddings"] = file1_embeddings
+            st.session_state["file2_embeddings"] = file2_embeddings
+            st.session_state["file1_industry"] = file1_industry
+            st.session_state["file2_industry"] = file2_industry
+            st.session_state["file1_rulechoice"] = file1_rulechoice
+            st.session_state["file2_rulechoice"] = file2_rulechoice
+            st.session_state["file1_filetype"] = file1_filetype
+            st.session_state["file2_filetype"] = file2_filetype
+            st.session_state["file1_section_list"] = file1_section_list
+            st.session_state["file2_section_list"] = file2_section_list
+
         st.subheader("已选择的文件1：")
         # display file1 rulechoice
         if file1_rulechoice != []:
@@ -661,7 +683,37 @@ def main():
             for i, (dis1, dis2, dis3) in enumerate(zip(dis1ls, dis2ls, dis3ls)):
                 st.info("序号" + str(i + 1) + ": " + dis1)
                 st.warning(dis2)
-                st.table(dis3)
+
+                tab1, tab2 = st.tabs(["匹配结果", "制度浏览"])
+                with tab1:
+                    st.table(dis3)
+                # get columns value list of dis3
+                mdf1 = dis3[[ "匹配制度", "匹配章节"]]
+                # groupby col1 and convert col2 to list
+                mdf2 = mdf1.groupby("匹配制度")["匹配章节"].apply(list).reset_index()
+                
+                plcmatch = mdf2[ "匹配制度"].tolist()
+                colmatch = mdf2[ "匹配章节"].tolist()
+                
+                disdf=sentencedf[['监管要求','结构','条款']].reset_index(drop=True)
+                # st.write(disdf)
+                with tab2:
+                    for plc,col in zip(plcmatch,colmatch):
+                        st.markdown("#### " + plc)
+                        # st.write(col)
+
+                        subdf = disdf[(disdf["监管要求"] == plc)][["结构", "条款"]]
+                        # Subset your original dataframe with condition
+                        df_ = subdf[(subdf["结构"].isin(col))]
+                        # st.write(df_)
+
+                        # Pass the subset dataframe index and column to pd.IndexSlice
+                        slice_ = pd.IndexSlice[df_.index, df_.columns]
+                        # st.write(slice_)
+                        s = subdf.style.set_properties(**{'background-color': 'yellow'}, subset=slice_)
+                        # display s in html format
+                        st.table(s)                        
+                
             # analysis is done
             st.sidebar.success("分析完成")
             st.sidebar.download_button(
