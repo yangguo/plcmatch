@@ -16,6 +16,7 @@ from upload import (
     save_uploadedfile,
     savedf,
     upload_data,
+    searchupload
 )
 from utils import (
     df2aggrid,
@@ -35,7 +36,7 @@ auditfolder = "data/audit"
 def main():
 
     # st.subheader("制度匹配分析")
-    menu = ["文件上传", "文件选择", "匹配分析"]
+    menu = ["文件上传", "文件选择", "匹配分析", "文件浏览"]
     choice = st.sidebar.selectbox("选择", menu)
 
     # initialize session value file1df, file1_embeddings
@@ -66,6 +67,7 @@ def main():
         st.session_state["file2_section_list"] = []
 
     if choice == "文件上传":
+        st.subheader("文件上传")
         # choose input method of manual or upload file
         input_method = st.sidebar.radio("文件上传方式", ("手动输入", "上传文件"))
 
@@ -178,7 +180,10 @@ def main():
         # display all policy
         st.write("已编码的文件：")
         uploadfilels = get_uploadfiles()
-        st.write(uploadfilels)
+        # st.write(uploadfilels)
+        # display all upload files
+        for uploadfile in uploadfilels:
+            st.markdown(f"- {uploadfile}")
         remove = st.button("删除已上传文件")
         if remove:
             remove_uploadfiles()
@@ -722,7 +727,126 @@ def main():
                 data=sampledf.to_csv(),
                 mime="text/csv",
             )
+    elif choice == "文件浏览":
+        st.subheader("文件浏览")
+        
+        upload_list = get_uploadfiles()
+        upload_choice = st.sidebar.multiselect("选择已上传文件:", upload_list)
+        if upload_choice == []:
+            upload_choice = upload_list
+        
+        choosedf, choose_embeddings = get_upload_data(upload_choice)
 
+        # st.write(choosedf)
+        match = st.sidebar.radio('搜索方式', ('关键字搜索', '模糊搜索'))
+        # initialize session value search_result
+        if 'search_result' not in st.session_state:
+            st.session_state['search_result'] = None
+
+        # placeholder
+        placeholder = st.empty()
+
+        if match == '关键字搜索':
+            item_text = st.sidebar.text_input('按条文关键字搜索')
+
+            if item_text != '':
+                fullresultdf, total = searchByItem(choosedf, upload_choice,
+                                                   "", item_text)
+                # new_keywords_list = item_text.split()
+
+                resultdf = fullresultdf[[ "制度", "结构", "条款"]]
+
+                if resultdf.empty:
+                    placeholder.text('没有搜索结果')
+                else:
+                    # reset index
+                    resultdf = resultdf.reset_index(drop=True)
+                    # placeholder.table(resultdf)
+
+                    with placeholder.container():
+                        # get columns value list of resultdf
+                        mdf1 = resultdf[[ "制度", "结构"]]
+                        # groupby col1 and convert col2 to list
+                        mdf2 = mdf1.groupby("制度")["结构"].apply(list).reset_index()
+                        
+                        plcmatch = mdf2[ "制度"].tolist()
+                        colmatch = mdf2[ "结构"].tolist()
+                        # display plc list
+                        plcstr = "、".join(plcmatch)
+                        st.warning("##### " + "匹配制度: " + plcstr)
+
+                        for plc,col in zip(plcmatch,colmatch):
+                            st.markdown("#### " + plc)
+
+
+                            tab1, tab2 = st.tabs(["匹配结果", "制度浏览"])
+                            with tab1:
+                                disdf1=resultdf[(resultdf["制度"] == plc)][["结构", "条款"]]
+                                st.table(disdf1)
+
+                            disdf=choosedf[['制度','结构','条款']].reset_index(drop=True)
+                            # st.write(disdf)
+                            with tab2:
+                                # st.write(col)
+
+                                subdf = disdf[(disdf["制度"] == plc)][["结构", "条款"]]
+                                # Subset your original dataframe with condition
+                                df_ = subdf[(subdf["结构"].isin(col))]
+                                # st.write(df_)
+
+                                # Pass the subset dataframe index and column to pd.IndexSlice
+                                slice_ = pd.IndexSlice[df_.index, df_.columns]
+                                # st.write(slice_)
+                                s = subdf.style.set_properties(**{'background-color': 'yellow'}, subset=slice_)
+                                # display s in html format
+                                st.table(s)     
+
+
+                    # search is done
+                    # st.sidebar.success('搜索完成')
+                    st.sidebar.success('共搜索到' + str(total) + '条结果')
+                    st.sidebar.download_button(label='下载搜索结果',
+                                            data=resultdf.to_csv(),
+                                            file_name='搜索结果.csv',
+                                            mime='text/csv')
+
+
+            else:
+                st.sidebar.warning('请输入搜索条件')
+                resultdf = st.session_state['search_result']
+
+        elif match == '模糊搜索':
+            search_text = st.sidebar.text_area('输入搜索条件')
+
+            top = st.sidebar.slider('匹配数量选择',
+                                    min_value=1,
+                                    max_value=10,
+                                    value=3)
+
+            search = st.sidebar.button('搜索条款')
+
+            if search:
+                with st.spinner('正在搜索...'):
+                    fullresultdf = searchupload(search_text, choosedf,
+                                              choose_embeddings,
+                                              top )
+
+
+                    resultdf = fullresultdf[:top][[ "制度", "结构", "条款"]]
+
+                    # reset index
+                    resultdf.reset_index(drop=True, inplace=True)
+                    placeholder.table(resultdf)
+                    # search is done
+                    # st.sidebar.success('搜索完成')
+                    st.sidebar.success('共搜索到' + str(resultdf.shape[0]) + '条结果')
+                    st.sidebar.download_button(label='下载搜索结果',
+                                               data=resultdf.to_csv(),
+                                               file_name='搜索结果.csv',
+                                               mime='text/csv')
+            else:
+                st.sidebar.warning('请输入搜索条件')
+                resultdf = st.session_state['search_result']
 
 if __name__ == "__main__":
     main()

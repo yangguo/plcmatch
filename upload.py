@@ -2,8 +2,9 @@ import os
 import pandas as pd
 import streamlit as st
 import numpy as np
+import scipy
 
-from utils import get_csvdf, get_embedding, sent2emb_async
+from utils import get_csvdf, get_embedding, sent2emb_async,roformer_encoder
 
 import docx
 import glob
@@ -189,3 +190,33 @@ def save_uploadedfile(uploadedfile):
     with open(os.path.join(uploadfolder, uploadedfile.name), "wb") as f:
         f.write(uploadedfile.getbuffer())
     return st.success("上传文件:{} 成功。".format(uploadedfile.name))
+
+
+def searchupload(text, ruledf, sentence_embeddings, top):
+    queries = [text]
+    query_embeddings = roformer_encoder(queries)
+
+    # emblist = ruledf['监管要求'].drop_duplicates().tolist()
+    # fix index
+    # fixruledf, _ = searchByItem(ruledf, emblist, '', '')
+    # get index of rule
+    # rule_index = fixruledf.index.tolist()
+
+    # get sub embedding
+    sub_embedding = sentence_embeddings#[rule_index]
+
+    avglist = []
+    idxlist = []
+    number_top_matches = top
+    for query, query_embedding in zip(queries, query_embeddings):
+        distances = scipy.spatial.distance.cdist([query_embedding],
+                                                 sub_embedding, "cosine")[0]
+
+        results = zip(range(len(distances)), distances)
+        results = sorted(results, key=lambda x: x[1])
+
+        for idx, distance in results[0:number_top_matches]:
+            idxlist.append(idx)
+            avglist.append(1 - distance)
+
+    return ruledf.iloc[idxlist]

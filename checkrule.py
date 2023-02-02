@@ -25,7 +25,7 @@ def searchByItem(searchresult, make_choice, column_text, item_text):
     item_text_list = split_words(item_text)
     column_text = fix_section_text(column_text)
     plcsam = searchresult[(searchresult['监管要求'].isin(make_choice))
-                          & (searchresult['结构'].str.contains(column_text)) &
+                          & (searchresult['结构'].astype(str).str.contains(column_text)) &
                           (searchresult['条款'].str.contains(item_text_list))]
     total = len(plcsam)
     return plcsam, total
