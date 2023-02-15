@@ -1,5 +1,7 @@
 import ast
 import io
+import os
+
 import pandas as pd
 import streamlit as st
 
@@ -7,16 +9,17 @@ import streamlit as st
 from streamlit_tags import st_tags, st_tags_sidebar
 
 from analysis import df2list, do_plot_match, get_matchplc
-from checkaudit import searchauditByItem, searchauditByName, get_sampleaudit
+from checkaudit import get_sampleaudit, searchauditByItem, searchauditByName
 from checkrule import get_rule_data, searchByItem, searchByName
+from gptfuc import build_index, gpt_answer
 from upload import (
     get_upload_data,
     get_uploadfiles,
     remove_uploadfiles,
     save_uploadedfile,
     savedf,
+    searchupload,
     upload_data,
-    searchupload
 )
 from utils import (
     df2aggrid,
@@ -36,7 +39,7 @@ auditfolder = "data/audit"
 def main():
 
     # st.subheader("制度匹配分析")
-    menu = ["文件上传", "文件选择", "匹配分析", "文件浏览"]
+    menu = ["文件上传", "文件选择", "匹配分析", "文件浏览", "文件问答"]
     choice = st.sidebar.selectbox("选择", menu)
 
     # initialize session value file1df, file1_embeddings
@@ -649,7 +652,7 @@ def main():
                 sentencedf, sentence_embeddings = subruledf, subrule_embeddings
 
             validdf = get_matchplc(
-                querydf, query_embeddings, sentencedf, sentence_embeddings, top,x / 100
+                querydf, query_embeddings, sentencedf, sentence_embeddings, top, x / 100
             )
             combdf = pd.concat([querydf.reset_index(drop=True), validdf], axis=1)
             match = st.sidebar.radio("条款匹配分析条件", ("查看匹配条款", "查看不匹配条款"))
@@ -658,13 +661,11 @@ def main():
                 # combdf["是否匹配"] = (combdf["平均匹配度"] >= x / 100).astype(int)
                 # get maximum value from list
                 combdf["是否匹配"] = combdf["匹配状态"].apply(lambda x: max(x))
-                flag=1
+                flag = 1
             else:
                 # combdf["是否匹配"] = (combdf["平均匹配度"] < x / 100).astype(int)
-                combdf["是否匹配"] = (combdf["匹配状态"].apply(lambda x: max(x))==0)
-                flag=0
-
-
+                combdf["是否匹配"] = combdf["匹配状态"].apply(lambda x: max(x)) == 0
+                flag = 0
 
             if review_mode == "否":
                 do_plot_match(combdf, match)
@@ -693,17 +694,17 @@ def main():
                 with tab1:
                     st.table(dis3)
                 # get columns value list of dis3
-                mdf1 = dis3[[ "匹配制度", "匹配章节"]]
+                mdf1 = dis3[["匹配制度", "匹配章节"]]
                 # groupby col1 and convert col2 to list
                 mdf2 = mdf1.groupby("匹配制度")["匹配章节"].apply(list).reset_index()
-                
-                plcmatch = mdf2[ "匹配制度"].tolist()
-                colmatch = mdf2[ "匹配章节"].tolist()
-                
-                disdf=sentencedf[['监管要求','结构','条款']].reset_index(drop=True)
+
+                plcmatch = mdf2["匹配制度"].tolist()
+                colmatch = mdf2["匹配章节"].tolist()
+
+                disdf = sentencedf[["监管要求", "结构", "条款"]].reset_index(drop=True)
                 # st.write(disdf)
                 with tab2:
-                    for plc,col in zip(plcmatch,colmatch):
+                    for plc, col in zip(plcmatch, colmatch):
                         st.markdown("#### " + plc)
                         # st.write(col)
 
@@ -715,10 +716,12 @@ def main():
                         # Pass the subset dataframe index and column to pd.IndexSlice
                         slice_ = pd.IndexSlice[df_.index, df_.columns]
                         # st.write(slice_)
-                        s = subdf.style.set_properties(**{'background-color': 'yellow'}, subset=slice_)
+                        s = subdf.style.set_properties(
+                            **{"background-color": "yellow"}, subset=slice_
+                        )
                         # display s in html format
-                        st.table(s)                        
-                
+                        st.table(s)
+
             # analysis is done
             st.sidebar.success("分析完成")
             st.sidebar.download_button(
@@ -729,35 +732,36 @@ def main():
             )
     elif choice == "文件浏览":
         st.subheader("文件浏览")
-        
+
         upload_list = get_uploadfiles()
         upload_choice = st.sidebar.multiselect("选择已上传文件:", upload_list)
         if upload_choice == []:
             upload_choice = upload_list
-        
+
         choosedf, choose_embeddings = get_upload_data(upload_choice)
 
         # st.write(choosedf)
-        match = st.sidebar.radio('搜索方式', ('关键字搜索', '模糊搜索'))
+        match = st.sidebar.radio("搜索方式", ("关键字搜索", "模糊搜索"))
         # initialize session value search_result
-        if 'search_result' not in st.session_state:
-            st.session_state['search_result'] = None
+        if "search_result" not in st.session_state:
+            st.session_state["search_result"] = None
 
         # placeholder
         placeholder = st.empty()
 
-        if match == '关键字搜索':
-            item_text = st.sidebar.text_input('按条文关键字搜索')
+        if match == "关键字搜索":
+            item_text = st.sidebar.text_input("按条文关键字搜索")
 
-            if item_text != '':
-                fullresultdf, total = searchByItem(choosedf, upload_choice,
-                                                   "", item_text)
+            if item_text != "":
+                fullresultdf, total = searchByItem(
+                    choosedf, upload_choice, "", item_text
+                )
                 # new_keywords_list = item_text.split()
 
-                resultdf = fullresultdf[[ "制度", "结构", "条款"]]
+                resultdf = fullresultdf[["制度", "结构", "条款"]]
 
                 if resultdf.empty:
-                    placeholder.text('没有搜索结果')
+                    placeholder.text("没有搜索结果")
                 else:
                     # reset index
                     resultdf = resultdf.reset_index(drop=True)
@@ -765,26 +769,25 @@ def main():
 
                     with placeholder.container():
                         # get columns value list of resultdf
-                        mdf1 = resultdf[[ "制度", "结构"]]
+                        mdf1 = resultdf[["制度", "结构"]]
                         # groupby col1 and convert col2 to list
                         mdf2 = mdf1.groupby("制度")["结构"].apply(list).reset_index()
-                        
-                        plcmatch = mdf2[ "制度"].tolist()
-                        colmatch = mdf2[ "结构"].tolist()
+
+                        plcmatch = mdf2["制度"].tolist()
+                        colmatch = mdf2["结构"].tolist()
                         # display plc list
                         plcstr = "、".join(plcmatch)
                         st.warning("##### " + "匹配制度: " + plcstr)
 
-                        for plc,col in zip(plcmatch,colmatch):
+                        for plc, col in zip(plcmatch, colmatch):
                             st.markdown("#### " + plc)
-
 
                             tab1, tab2 = st.tabs(["匹配结果", "制度浏览"])
                             with tab1:
-                                disdf1=resultdf[(resultdf["制度"] == plc)][["结构", "条款"]]
+                                disdf1 = resultdf[(resultdf["制度"] == plc)][["结构", "条款"]]
                                 st.table(disdf1)
 
-                            disdf=choosedf[['制度','结构','条款']].reset_index(drop=True)
+                            disdf = choosedf[["制度", "结构", "条款"]].reset_index(drop=True)
                             # st.write(disdf)
                             with tab2:
                                 # st.write(col)
@@ -797,56 +800,78 @@ def main():
                                 # Pass the subset dataframe index and column to pd.IndexSlice
                                 slice_ = pd.IndexSlice[df_.index, df_.columns]
                                 # st.write(slice_)
-                                s = subdf.style.set_properties(**{'background-color': 'yellow'}, subset=slice_)
+                                s = subdf.style.set_properties(
+                                    **{"background-color": "yellow"}, subset=slice_
+                                )
                                 # display s in html format
-                                st.table(s)     
-
+                                st.table(s)
 
                     # search is done
                     # st.sidebar.success('搜索完成')
-                    st.sidebar.success('共搜索到' + str(total) + '条结果')
-                    st.sidebar.download_button(label='下载搜索结果',
-                                            data=resultdf.to_csv(),
-                                            file_name='搜索结果.csv',
-                                            mime='text/csv')
-
+                    st.sidebar.success("共搜索到" + str(total) + "条结果")
+                    st.sidebar.download_button(
+                        label="下载搜索结果",
+                        data=resultdf.to_csv(),
+                        file_name="搜索结果.csv",
+                        mime="text/csv",
+                    )
 
             else:
-                st.sidebar.warning('请输入搜索条件')
-                resultdf = st.session_state['search_result']
+                st.sidebar.warning("请输入搜索条件")
+                resultdf = st.session_state["search_result"]
 
-        elif match == '模糊搜索':
-            search_text = st.sidebar.text_area('输入搜索条件')
+        elif match == "模糊搜索":
+            search_text = st.sidebar.text_area("输入搜索条件")
 
-            top = st.sidebar.slider('匹配数量选择',
-                                    min_value=1,
-                                    max_value=10,
-                                    value=3)
+            top = st.sidebar.slider("匹配数量选择", min_value=1, max_value=10, value=3)
 
-            search = st.sidebar.button('搜索条款')
+            search = st.sidebar.button("搜索条款")
 
             if search:
-                with st.spinner('正在搜索...'):
-                    fullresultdf = searchupload(search_text, choosedf,
-                                              choose_embeddings,
-                                              top )
+                with st.spinner("正在搜索..."):
+                    fullresultdf = searchupload(
+                        search_text, choosedf, choose_embeddings, top
+                    )
 
-
-                    resultdf = fullresultdf[:top][[ "制度", "结构", "条款"]]
+                    resultdf = fullresultdf[:top][["制度", "结构", "条款"]]
 
                     # reset index
                     resultdf.reset_index(drop=True, inplace=True)
                     placeholder.table(resultdf)
                     # search is done
                     # st.sidebar.success('搜索完成')
-                    st.sidebar.success('共搜索到' + str(resultdf.shape[0]) + '条结果')
-                    st.sidebar.download_button(label='下载搜索结果',
-                                               data=resultdf.to_csv(),
-                                               file_name='搜索结果.csv',
-                                               mime='text/csv')
+                    st.sidebar.success("共搜索到" + str(resultdf.shape[0]) + "条结果")
+                    st.sidebar.download_button(
+                        label="下载搜索结果",
+                        data=resultdf.to_csv(),
+                        file_name="搜索结果.csv",
+                        mime="text/csv",
+                    )
             else:
-                st.sidebar.warning('请输入搜索条件')
-                resultdf = st.session_state['search_result']
+                st.sidebar.warning("请输入搜索条件")
+                resultdf = st.session_state["search_result"]
+
+    elif choice == "文件问答":
+        st.subheader("文件问答")
+        # enbedding button
+        embedding = st.sidebar.button("生成问答模型")
+        if embedding:
+            with st.spinner("正在生成问答模型..."):
+                # generate embeddings
+                build_index()
+                st.success("问答模型生成完成")
+
+        # question input
+        question = st.text_input("输入问题")
+        if question != "":
+            # answer button
+            answer_btn = st.button("获取答案")
+            if answer_btn:
+                with st.spinner("正在获取答案..."):
+                    # get answer
+                    answer = gpt_answer(question)
+                    st.write(answer)
+
 
 if __name__ == "__main__":
     main()
