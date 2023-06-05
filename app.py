@@ -11,7 +11,7 @@ from streamlit_tags import st_tags, st_tags_sidebar
 from analysis import df2list, do_plot_match, get_matchplc
 from checkaudit import get_sampleaudit, searchauditByItem, searchauditByName
 from checkrule import get_rule_data, searchByItem, searchByName
-from gptfuc import build_index, gpt_answer
+# from gptfuc import build_index, gpt_answer
 from upload import (
     get_upload_data,
     get_uploadfiles,
@@ -39,7 +39,7 @@ auditfolder = "data/audit"
 def main():
 
     # st.subheader("制度匹配分析")
-    menu = ["文件上传", "文件选择", "匹配分析", "文件浏览", "文件问答"]
+    menu = ["文件上传", "文件选择", "匹配分析", "文件浏览"]
     choice = st.sidebar.selectbox("选择", menu)
 
     # initialize session value file1df, file1_embeddings
@@ -489,8 +489,10 @@ def main():
         match_method = st.sidebar.radio("匹配方法选择", ("语义匹配", "关键词匹配"))
         subruledf = file1df
         subrule_embeddings = file1_embeddings
-        uploaddf = file2df
+        uploaddf = file2df[['条款','结构','监管要求']]
         upload_embeddings = file2_embeddings
+
+        st.write(uploaddf)
 
         if match_method == "关键词匹配":
             # initialize session value proc_list
@@ -558,8 +560,9 @@ def main():
                 select_proc = selected_rows[0]["条款"]
                 # get keyword
                 select_keyword = selected_rows[0]["关键词"]
+                # st.write(select_keyword)
                 # convert to list
-                select_keyword = ast.literal_eval(select_keyword)
+                # select_keyword = ast.literal_eval(select_keyword)
                 # get index
                 select_index = selected_rows[0]["序号"]
                 # update keyword_list
@@ -656,7 +659,7 @@ def main():
             )
             combdf = pd.concat([querydf.reset_index(drop=True), validdf], axis=1)
             match = st.sidebar.radio("条款匹配分析条件", ("查看匹配条款", "查看不匹配条款"))
-            st.write(combdf)
+            # st.write(combdf)
             if match == "查看匹配条款":
                 # combdf["是否匹配"] = (combdf["平均匹配度"] >= x / 100).astype(int)
                 # get maximum value from list
@@ -851,26 +854,6 @@ def main():
                 st.sidebar.warning("请输入搜索条件")
                 resultdf = st.session_state["search_result"]
 
-    elif choice == "文件问答":
-        st.subheader("文件问答")
-        # enbedding button
-        embedding = st.sidebar.button("生成问答模型")
-        if embedding:
-            with st.spinner("正在生成问答模型..."):
-                # generate embeddings
-                build_index()
-                st.success("问答模型生成完成")
-
-        # question input
-        question = st.text_input("输入问题")
-        if question != "":
-            # answer button
-            answer_btn = st.button("获取答案")
-            if answer_btn:
-                with st.spinner("正在获取答案..."):
-                    # get answer
-                    answer = gpt_answer(question)
-                    st.write(answer)
 
 
 if __name__ == "__main__":

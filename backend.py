@@ -2,7 +2,8 @@ import os
 
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
-from gpt_index import GPTSimpleVectorIndex, LLMPredictor
+from llama_index import GPTSimpleVectorIndex, LLMPredictor
+from llama_index import GPTVectorStoreIndex, SimpleDirectoryReader
 from langchain import OpenAI
 
 uploadfolder = "uploads"

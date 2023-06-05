@@ -1,7 +1,7 @@
 import os
 
 import requests
-from gpt_index import GPTSimpleVectorIndex, SimpleDirectoryReader
+# from gpt_index import GPTSimpleVectorIndex, SimpleDirectoryReader
 
 # os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAI_API_KEY")
 
@@ -14,10 +14,10 @@ backendurl = "http://localhost:8000"
 
 
 def build_index():
-    documents = SimpleDirectoryReader(uploadfolder, recursive=True).load_data()
-    index = GPTSimpleVectorIndex(documents)
-    index.save_to_disk(os.path.join(uploadfolder, "filedata.json"))
-
+    # documents = SimpleDirectoryReader(uploadfolder, recursive=True).load_data()
+    # index = GPTSimpleVectorIndex(documents)
+    # index.save_to_disk(os.path.join(uploadfolder, "filedata.json"))
+    print('build_index')
 
 def gpt_answer(question):
     try:
