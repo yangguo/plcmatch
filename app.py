@@ -10,7 +10,7 @@ from streamlit_tags import st_tags, st_tags_sidebar
 
 from analysis import df2list, do_plot_match, get_matchplc
 from checkaudit import get_sampleaudit, searchauditByItem, searchauditByName
-from checkrule import get_rule_data, searchByItem, searchByName
+from checkrule import get_rule_data, searchByItem, searchByName,searchByNamesupa
 # from gptfuc import build_index, gpt_answer
 from upload import (
     get_upload_data,
@@ -235,7 +235,7 @@ def main():
             )
 
             name_text = ""
-            rule_val, rule_list = searchByName(name_text, industry_choice)
+            rule_val, rule_list = searchByNamesupa(name_text, industry_choice)
             rule_choice = st.sidebar.multiselect("选择匹配监管要求:", rule_list, rule_choice)
             rule_section_list = get_section_list(rule_val, rule_choice)
             rule_column_ls = st.sidebar.multiselect(

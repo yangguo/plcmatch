@@ -1,4 +1,9 @@
 from utils import split_words, get_csvdf, get_rulefolder, get_embedding
+from gptfuc import init_supabase, industry_name_to_code
+import pandas as pd
+
+supabase = init_supabase()
+
 
 def get_samplerule(key_list, industry_choice):
     rulefolder = get_rulefolder(industry_choice)
@@ -45,3 +50,23 @@ def get_rule_data(key_list, industry_choice):
     emblist = selectdf['监管要求'].unique().tolist()
     rule_encode = get_embedding(rulefolder, emblist)
     return selectdf, rule_encode
+
+
+def searchByNamesupa(search_text, industry_choice):
+    table_name = industry_name_to_code(industry_choice)
+
+    # print(table_name)
+    # Get all records from table and cast 'metadata' to text type
+    result = supabase.table(table_name).select("content, metadata").execute()
+
+    # print(result.data)
+    # Convert the results to a DataFrame
+    df = pd.json_normalize(result.data)
+    df.columns = ["条款", "结构", "监管要求"]
+    # print(df)
+    # Filter DataFrame based on conditions
+    filtered_results = df[df["监管要求"].str.contains(f".*{search_text}.*")]
+
+    choicels = filtered_results["监管要求"].unique().tolist()
+
+    return filtered_results, choicels

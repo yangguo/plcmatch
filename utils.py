@@ -25,7 +25,7 @@ tokenizer = RoFormerTokenizer.from_pretrained(modelfolder)
 model = RoFormerModel.from_pretrained(modelfolder)
 
 smodel = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
-nlp = spacy.load("zh_core_web_lg")
+# nlp = spacy.load("zh_core_web_lg")
 
 
 # def async sent2emb(sentences):
@@ -184,36 +184,36 @@ def get_auditfolder(industry_choice):
 
 
 # cut text into words using spacy
-def cut_sentences(text):
-    # cut text into words
-    doc = nlp(text)
-    sents = [t.text for t in doc]
-    return sents
+# def cut_sentences(text):
+#     # cut text into words
+#     doc = nlp(text)
+#     sents = [t.text for t in doc]
+#     return sents
 
 
 # find similar words in doc embedding
-def find_similar_words(words, doc, threshold_key=0.5, top_n=3):
-    # compute similarity
-    similarities = {}
-    for word in words:
-        tok = nlp(word)
-        similarities[tok.text] = {}
-        for tok_ in doc:
-            similarities[tok.text].update({tok_.text: tok.similarity(tok_)})
-    # sort
-    topk = lambda x: {
-        k: v
-        for k, v in sorted(
-            similarities[x].items(), key=lambda item: item[1], reverse=True
-        )[:top_n]
-    }
-    result = {word: topk(word) for word in words}
-    # filter by threshold
-    result_filter = {
-        word: {k: v for k, v in result[word].items() if v >= threshold_key}
-        for word in result
-    }
-    return result_filter
+# def find_similar_words(words, doc, threshold_key=0.5, top_n=3):
+#     # compute similarity
+#     similarities = {}
+#     for word in words:
+#         tok = nlp(word)
+#         similarities[tok.text] = {}
+#         for tok_ in doc:
+#             similarities[tok.text].update({tok_.text: tok.similarity(tok_)})
+#     # sort
+#     topk = lambda x: {
+#         k: v
+#         for k, v in sorted(
+#             similarities[x].items(), key=lambda item: item[1], reverse=True
+#         )[:top_n]
+#     }
+#     result = {word: topk(word) for word in words}
+#     # filter by threshold
+#     result_filter = {
+#         word: {k: v for k, v in result[word].items() if v >= threshold_key}
+#         for word in result
+#     }
+#     return result_filter
 
 
 # convert text spacy to word embedding
