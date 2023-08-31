@@ -9,12 +9,12 @@ import pandas as pd
 import spacy
 import streamlit as st
 import torch
-from keybert import KeyBERT
+# from keybert import KeyBERT
 from sentence_transformers import SentenceTransformer
 from st_aggrid import AgGrid
 from st_aggrid.grid_options_builder import GridOptionsBuilder
 from st_aggrid.shared import GridUpdateMode
-from textrank4zh import TextRank4Sentence
+# from textrank4zh import TextRank4Sentence
 from transformers import RoFormerModel, RoFormerTokenizer
 
 modelfolder = "junnyu/roformer_chinese_sim_char_ft_base"
@@ -24,7 +24,7 @@ auditfolder = "data/audit"
 tokenizer = RoFormerTokenizer.from_pretrained(modelfolder)
 model = RoFormerModel.from_pretrained(modelfolder)
 
-smodel = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
+# smodel = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
 # nlp = spacy.load("zh_core_web_lg")
 
 
@@ -56,14 +56,14 @@ async def sent2emb(sents):
 
 
 # get summary of text
-def get_summary(text):
-    tr4s = TextRank4Sentence()
-    tr4s.analyze(text=text, lower=True, source="all_filters")
-    sumls = []
-    for item in tr4s.get_key_sentences(num=3):
-        sumls.append(item.sentence)
-    summary = "".join(sumls)
-    return summary
+# def get_summary(text):
+#     tr4s = TextRank4Sentence()
+#     tr4s.analyze(text=text, lower=True, source="all_filters")
+#     sumls = []
+#     for item in tr4s.get_key_sentences(num=3):
+#         sumls.append(item.sentence)
+#     summary = "".join(sumls)
+#     return summary
 
 
 # Mean Pooling - Take attention mask into account for correct averaging
@@ -217,85 +217,85 @@ def get_auditfolder(industry_choice):
 
 
 # convert text spacy to word embedding
-def text2emb(text):
-    # cut text into words
-    doc = nlp(text)
-    return doc
+# def text2emb(text):
+#     # cut text into words
+#     doc = nlp(text)
+#     return doc
 
 
 # get similarity using keywords between two docs
-def get_similar_keywords(keyls, audit_list, key_top_n=3, threshold_key=0.5):
+# def get_similar_keywords(keyls, audit_list, key_top_n=3, threshold_key=0.5):
 
-    audit_keywords = dict()
-    for idx, audit in enumerate(audit_list):
+#     audit_keywords = dict()
+#     for idx, audit in enumerate(audit_list):
 
-        doc = text2emb(audit)
-        result = find_similar_words(keyls, doc, threshold_key, top_n=key_top_n)
-        subls = []
-        for key in keyls:
-            subls.append(list(result[key].keys()))
-        # flatten subls
-        subls = [item for sub in subls for item in sub]
-        # remove duplicates
-        subls = list(set(subls))
-        audit_keywords[idx] = subls
+#         doc = text2emb(audit)
+#         result = find_similar_words(keyls, doc, threshold_key, top_n=key_top_n)
+#         subls = []
+#         for key in keyls:
+#             subls.append(list(result[key].keys()))
+#         # flatten subls
+#         subls = [item for sub in subls for item in sub]
+#         # remove duplicates
+#         subls = list(set(subls))
+#         audit_keywords[idx] = subls
 
-        # get audit_keywords keys sorted by value length
-        audit_keywords_sorted = sorted(
-            audit_keywords.items(), key=lambda x: len(x[1]), reverse=True
-        )
-        # get keys of audit_keywords_sorted
-        audit_keywords_keys = [
-            key for key, value in audit_keywords_sorted if len(value) > 0
-        ]
-    return audit_keywords_keys
+#         # get audit_keywords keys sorted by value length
+#         audit_keywords_sorted = sorted(
+#             audit_keywords.items(), key=lambda x: len(x[1]), reverse=True
+#         )
+#         # get keys of audit_keywords_sorted
+#         audit_keywords_keys = [
+#             key for key, value in audit_keywords_sorted if len(value) > 0
+#         ]
+#     return audit_keywords_keys
 
 
 # get most similar from list of sentences
-def get_most_similar(keyls, audit_list, top_n=3):
-    audit_list_sorted = get_similar_keywords(
-        keyls, audit_list, key_top_n=3, threshold_key=0.5
-    )
-    return audit_list_sorted[:top_n]
+# def get_most_similar(keyls, audit_list, top_n=3):
+#     audit_list_sorted = get_similar_keywords(
+#         keyls, audit_list, key_top_n=3, threshold_key=0.5
+#     )
+#     return audit_list_sorted[:top_n]
 
 
 # get tfidf keywords list
-def get_keywords(proc_list, key_num=3):
-    key_list = []
-    for proc in proc_list:
-        key_list.append(keybert_keywords(proc, key_num))
-    return key_list
+# def get_keywords(proc_list, key_num=3):
+#     key_list = []
+#     for proc in proc_list:
+#         key_list.append(keybert_keywords(proc, key_num))
+#     return key_list
 
 
 # get exact match
-def get_exect_similar(searchresult, item_text, top_num):
-    # join item_text
-    item_text = " ".join(item_text)
-    # split words item_text
-    item_text_list = split_words(item_text)
-    # print(item_text_list)
-    plcsam = searchresult[(searchresult["条款"].str.contains(item_text_list))]
-    return plcsam[:top_num]
+# def get_exect_similar(searchresult, item_text, top_num):
+#     # join item_text
+#     item_text = " ".join(item_text)
+#     # split words item_text
+#     item_text_list = split_words(item_text)
+#     # print(item_text_list)
+#     plcsam = searchresult[(searchresult["条款"].str.contains(item_text_list))]
+#     return plcsam[:top_num]
 
 
-# get keyword list using keybert
-def keybert_keywords(text, top_n=5):
-    doc = " ".join(cut_sentences(text))
-    bertModel = KeyBERT(model=smodel)
-    # keywords = bertModel.extract_keywords(doc,keyphrase_ngram_range=(1,1),stop_words=None,top_n=top_n)
-    # mmr
-    keywords = bertModel.extract_keywords(
-        doc,
-        keyphrase_ngram_range=(1, 1),
-        stop_words="english",
-        use_mmr=True,
-        diversity=0.7,
-        top_n=top_n,
-    )
-    keyls = []
-    for (key, val) in keywords:
-        keyls.append(key)
-    return keyls
+# # get keyword list using keybert
+# def keybert_keywords(text, top_n=5):
+#     doc = " ".join(cut_sentences(text))
+#     bertModel = KeyBERT(model=smodel)
+#     # keywords = bertModel.extract_keywords(doc,keyphrase_ngram_range=(1,1),stop_words=None,top_n=top_n)
+#     # mmr
+#     keywords = bertModel.extract_keywords(
+#         doc,
+#         keyphrase_ngram_range=(1, 1),
+#         stop_words="english",
+#         use_mmr=True,
+#         diversity=0.7,
+#         top_n=top_n,
+#     )
+#     keyls = []
+#     for (key, val) in keywords:
+#         keyls.append(key)
+#     return keyls
 
 
 def df2aggrid(df):

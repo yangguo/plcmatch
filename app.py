@@ -6,7 +6,7 @@ import pandas as pd
 import streamlit as st
 
 # Import for dyanmic tagging
-from streamlit_tags import st_tags, st_tags_sidebar
+# from streamlit_tags import st_tags, st_tags_sidebar
 
 from analysis import df2list, do_plot_match, get_matchplc
 from checkaudit import get_sampleaudit, searchauditByItem, searchauditByName
@@ -25,10 +25,10 @@ from utils import (
     df2aggrid,
     get_auditfolder,
     get_embedding,
-    get_exect_similar,
+    # get_exect_similar,
     get_folder_list,
-    get_keywords,
-    get_most_similar,
+    # get_keywords,
+    # get_most_similar,
     get_section_list,
 )
 
@@ -494,149 +494,149 @@ def main():
 
         st.write(uploaddf)
 
-        if match_method == "关键词匹配":
-            # initialize session value proc_list
-            if "proc_list" not in st.session_state:
-                st.session_state["proc_list"] = []
-            # initialize session value keyword_list
-            if "keyword_list" not in st.session_state:
-                st.session_state["keyword_list"] = []
+        # if match_method == "关键词匹配":
+        #     # initialize session value proc_list
+        #     if "proc_list" not in st.session_state:
+        #         st.session_state["proc_list"] = []
+        #     # initialize session value keyword_list
+        #     if "keyword_list" not in st.session_state:
+        #         st.session_state["keyword_list"] = []
 
-            # get proc_list
-            proc_list = subruledf["条款"].tolist()
-            # get length of proc_list
-            proc_len = len(proc_list)
+        #     # get proc_list
+        #     proc_list = subruledf["条款"].tolist()
+        #     # get length of proc_list
+        #     proc_len = len(proc_list)
 
-            # use expander
-            with st.sidebar.expander("参数设置"):
-                # silidebar to choose key_num
-                key_num = st.slider("选择关键词数量", 1, 10, 3)
-                # get top number
-                top_num = st.slider("选择匹配结果数量", 1, 10, 3)
-                # get start index
-                start_index = st.number_input(
-                    "选择开始索引", 0, proc_len - 1, 0, key="start_index"
-                )
-                # convert to int
-                start_index = int(start_index)
-                # get end index
-                end_index = st.number_input(
-                    "选择结束索引", start_index, proc_len - 1, proc_len - 1, key="end_index"
-                )
-                # convert to int
-                end_index = int(end_index)
-                # match mode
-                match_mode = st.radio("精确模式", ("精确", "模糊"))
-            st.subheader("关键词分析")
-            # get keywords button
-            get_keywords_button = st.sidebar.button("获取关键词")
-            if get_keywords_button:
-                proc_list = proc_list[start_index : end_index + 1]
-                keywords_list = get_keywords(proc_list, key_num)
-                # update session value keyword_list
-                st.session_state["keyword_list"] = keywords_list
-                # update session value proc_list
-                st.session_state["proc_list"] = proc_list
-            else:
-                keywords_list = st.session_state["keyword_list"]
-                proc_list = st.session_state["proc_list"]
+        #     # use expander
+        #     with st.sidebar.expander("参数设置"):
+        #         # silidebar to choose key_num
+        #         key_num = st.slider("选择关键词数量", 1, 10, 3)
+        #         # get top number
+        #         top_num = st.slider("选择匹配结果数量", 1, 10, 3)
+        #         # get start index
+        #         start_index = st.number_input(
+        #             "选择开始索引", 0, proc_len - 1, 0, key="start_index"
+        #         )
+        #         # convert to int
+        #         start_index = int(start_index)
+        #         # get end index
+        #         end_index = st.number_input(
+        #             "选择结束索引", start_index, proc_len - 1, proc_len - 1, key="end_index"
+        #         )
+        #         # convert to int
+        #         end_index = int(end_index)
+        #         # match mode
+        #         match_mode = st.radio("精确模式", ("精确", "模糊"))
+        #     st.subheader("关键词分析")
+        #     # get keywords button
+        #     get_keywords_button = st.sidebar.button("获取关键词")
+        #     if get_keywords_button:
+        #         proc_list = proc_list[start_index : end_index + 1]
+        #         keywords_list = get_keywords(proc_list, key_num)
+        #         # update session value keyword_list
+        #         st.session_state["keyword_list"] = keywords_list
+        #         # update session value proc_list
+        #         st.session_state["proc_list"] = proc_list
+        #     else:
+        #         keywords_list = st.session_state["keyword_list"]
+        #         proc_list = st.session_state["proc_list"]
 
-            proc_df = pd.DataFrame({"条款": proc_list, "关键词": keywords_list})
-            # add index new column
-            proc_df["序号"] = proc_df.index
+        #     proc_df = pd.DataFrame({"条款": proc_list, "关键词": keywords_list})
+        #     # add index new column
+        #     proc_df["序号"] = proc_df.index
 
-            if proc_df.empty:
-                st.error("请先点击获取关键词")
-                st.stop()
+        #     if proc_df.empty:
+        #         st.error("请先点击获取关键词")
+        #         st.stop()
 
-            # st.table(proc_df)
-            select_df = df2aggrid(proc_df)
-            selected_rows = select_df["selected_rows"]
-            if selected_rows == []:
-                st.error("选择条款更新关键词")
-                # st.stop()
-            else:
-                # get proc
-                select_proc = selected_rows[0]["条款"]
-                # get keyword
-                select_keyword = selected_rows[0]["关键词"]
-                # st.write(select_keyword)
-                # convert to list
-                # select_keyword = ast.literal_eval(select_keyword)
-                # get index
-                select_index = selected_rows[0]["序号"]
-                # update keyword_list
-                keyword_update = st_tags(
-                    label="### 关键词更新",
-                    text="按回车键添加关键词",
-                    value=select_keyword,
-                    suggestions=select_keyword,
-                    maxtags=key_num,
-                )
-                # display select_proc
-                st.write("选择的条款：" + select_proc)
-                # convert list to string
-                select_keyword_str = "| ".join(select_keyword)
-                # display select_keyword
-                st.write("原关键词列表：" + select_keyword_str)
+        #     # st.table(proc_df)
+        #     select_df = df2aggrid(proc_df)
+        #     selected_rows = select_df["selected_rows"]
+        #     if selected_rows == []:
+        #         st.error("选择条款更新关键词")
+        #         # st.stop()
+        #     else:
+        #         # get proc
+        #         select_proc = selected_rows[0]["条款"]
+        #         # get keyword
+        #         select_keyword = selected_rows[0]["关键词"]
+        #         # st.write(select_keyword)
+        #         # convert to list
+        #         # select_keyword = ast.literal_eval(select_keyword)
+        #         # get index
+        #         select_index = selected_rows[0]["序号"]
+        #         # update keyword_list
+        #         keyword_update = st_tags(
+        #             label="### 关键词更新",
+        #             text="按回车键添加关键词",
+        #             value=select_keyword,
+        #             suggestions=select_keyword,
+        #             maxtags=key_num,
+        #         )
+        #         # display select_proc
+        #         st.write("选择的条款：" + select_proc)
+        #         # convert list to string
+        #         select_keyword_str = "| ".join(select_keyword)
+        #         # display select_keyword
+        #         st.write("原关键词列表：" + select_keyword_str)
 
-                # add update keyword button
-                update_keyword_button = st.button("更新关键词")
-                if update_keyword_button:
-                    # update keywords_list by index
-                    keywords_list[select_index] = keyword_update
-                    # update session value keyword_list
-                    st.session_state["keyword_list"] = keywords_list
-                    # rerun page
-                    st.experimental_rerun()
+        #         # add update keyword button
+        #         update_keyword_button = st.button("更新关键词")
+        #         if update_keyword_button:
+        #             # update keywords_list by index
+        #             keywords_list[select_index] = keyword_update
+        #             # update session value keyword_list
+        #             st.session_state["keyword_list"] = keywords_list
+        #             # rerun page
+        #             st.experimental_rerun()
 
-            # display button
-            submit = st.sidebar.button("开始匹配分析")
-            if submit:
-                # # get keyword_list
-                new_keywords_list = st.session_state["keyword_list"]
-                # # get proc_list
-                # proc_list = st.session_state['proc_list']
-                st.subheader("匹配结果：")
-                if match_mode == "精确":
-                    for i, (proc, keywords) in enumerate(
-                        zip(proc_list, new_keywords_list)
-                    ):
-                        with st.spinner("正在处理中..."):
+        #     # display button
+        #     submit = st.sidebar.button("开始匹配分析")
+        #     if submit:
+        #         # # get keyword_list
+        #         new_keywords_list = st.session_state["keyword_list"]
+        #         # # get proc_list
+        #         # proc_list = st.session_state['proc_list']
+        #         st.subheader("匹配结果：")
+        #         if match_mode == "精确":
+        #             for i, (proc, keywords) in enumerate(
+        #                 zip(proc_list, new_keywords_list)
+        #             ):
+        #                 with st.spinner("正在处理中..."):
 
-                            st.warning("序号" + str(i + 1) + ": " + proc)
-                            st.info("关键词: " + "/".join(keywords))
+        #                     st.warning("序号" + str(i + 1) + ": " + proc)
+        #                     st.info("关键词: " + "/".join(keywords))
 
-                            subuploaddf = get_exect_similar(uploaddf, keywords, top_num)
-                            # display result
-                            if subuploaddf.empty:
-                                st.write("没有匹配结果")
-                            else:
-                                st.table(subuploaddf)
-                                st.write("-" * 20)
+        #                     subuploaddf = get_exect_similar(uploaddf, keywords, top_num)
+        #                     # display result
+        #                     if subuploaddf.empty:
+        #                         st.write("没有匹配结果")
+        #                     else:
+        #                         st.table(subuploaddf)
+        #                         st.write("-" * 20)
 
-                elif match_mode == "模糊":
-                    audit_list = uploaddf["条款"].tolist()
-                    # get keywords list
+        #         elif match_mode == "模糊":
+        #             audit_list = uploaddf["条款"].tolist()
+        #             # get keywords list
 
-                    # display result
-                    for i, (proc, keywords) in enumerate(
-                        zip(proc_list, new_keywords_list)
-                    ):
-                        with st.spinner("正在处理中..."):
+        #             # display result
+        #             for i, (proc, keywords) in enumerate(
+        #                 zip(proc_list, new_keywords_list)
+        #             ):
+        #                 with st.spinner("正在处理中..."):
 
-                            st.warning("序号" + str(i + 1) + ": " + proc)
-                            st.info("关键词: " + "/".join(keywords))
+        #                     st.warning("序号" + str(i + 1) + ": " + proc)
+        #                     st.info("关键词: " + "/".join(keywords))
 
-                            result = get_most_similar(keywords, audit_list, top_num)
+        #                     result = get_most_similar(keywords, audit_list, top_num)
 
-                            # get subuploaddf based on index list
-                            subuploaddf = uploaddf.loc[result]
-                            # display result
-                            st.table(subuploaddf)
-                            st.write("-" * 20)
+        #                     # get subuploaddf based on index list
+        #                     subuploaddf = uploaddf.loc[result]
+        #                     # display result
+        #                     st.table(subuploaddf)
+        #                     st.write("-" * 20)
 
-        elif match_method == "语义匹配":
+        if match_method == "语义匹配":
             # use expander
             with st.sidebar.expander("参数设置"):
                 top = st.slider("匹配数量选择", min_value=1, max_value=10, value=2)
