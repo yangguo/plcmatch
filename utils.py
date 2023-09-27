@@ -1,58 +1,61 @@
-import asyncio
+# import asyncio
 import glob
 import os
 
 import numpy as np
 import pandas as pd
 
-# import jieba.analyse
-import spacy
-import streamlit as st
-import torch
 # from keybert import KeyBERT
-from sentence_transformers import SentenceTransformer
+# from sentence_transformers import SentenceTransformer
 from st_aggrid import AgGrid
 from st_aggrid.grid_options_builder import GridOptionsBuilder
 from st_aggrid.shared import GridUpdateMode
-# from textrank4zh import TextRank4Sentence
-from transformers import RoFormerModel, RoFormerTokenizer
 
-modelfolder = "junnyu/roformer_chinese_sim_char_ft_base"
+# import jieba.analyse
+# import spacy
+# import streamlit as st
+# import torch
+
+
+# from textrank4zh import TextRank4Sentence
+# from transformers import RoFormerModel, RoFormerTokenizer
+
+# modelfolder = "junnyu/roformer_chinese_sim_char_ft_base"
 rulefolder = "data/rules"
 auditfolder = "data/audit"
 
-tokenizer = RoFormerTokenizer.from_pretrained(modelfolder)
-model = RoFormerModel.from_pretrained(modelfolder)
+# tokenizer = RoFormerTokenizer.from_pretrained(modelfolder)
+# model = RoFormerModel.from_pretrained(modelfolder)
 
 # smodel = SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
 # nlp = spacy.load("zh_core_web_lg")
 
 
-# def async sent2emb(sentences):
-def sent2emb_async(sentences):
-    """
-    run sent2emb in async mode
-    """
-    # create new loop
-    loop = asyncio.new_event_loop()
-    # run async code
-    asyncio.set_event_loop(loop)
-    # run code
-    task = loop.run_until_complete(sent2emb(sentences))
-    # close loop
-    loop.close()
-    return task
+# # def async sent2emb(sentences):
+# def sent2emb_async(sentences):
+#     """
+#     run sent2emb in async mode
+#     """
+#     # create new loop
+#     loop = asyncio.new_event_loop()
+#     # run async code
+#     asyncio.set_event_loop(loop)
+#     # run code
+#     task = loop.run_until_complete(sent2emb(sentences))
+#     # close loop
+#     loop.close()
+#     return task
 
 
-async def sent2emb(sents):
-    embls = []
-    for sent in sents:
-        # get summary of sent
-        # summarize = get_summary(sent)
-        sentence_embedding = roformer_encoder(sent)
-        embls.append(sentence_embedding)
-    all_embeddings = np.concatenate(embls)
-    return all_embeddings
+# async def sent2emb(sents):
+#     embls = []
+#     for sent in sents:
+#         # get summary of sent
+#         # summarize = get_summary(sent)
+#         sentence_embedding = roformer_encoder(sent)
+#         embls.append(sentence_embedding)
+#     all_embeddings = np.concatenate(embls)
+#     return all_embeddings
 
 
 # get summary of text
@@ -66,33 +69,33 @@ async def sent2emb(sents):
 #     return summary
 
 
-# Mean Pooling - Take attention mask into account for correct averaging
-def mean_pooling(model_output, attention_mask):
-    # First element of model_output contains all token embeddings
-    token_embeddings = model_output[0]
-    input_mask_expanded = (
-        attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
-    )
-    return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(
-        input_mask_expanded.sum(1), min=1e-9
-    )
+# # Mean Pooling - Take attention mask into account for correct averaging
+# def mean_pooling(model_output, attention_mask):
+#     # First element of model_output contains all token embeddings
+#     token_embeddings = model_output[0]
+#     input_mask_expanded = (
+#         attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
+#     )
+#     return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(
+#         input_mask_expanded.sum(1), min=1e-9
+#     )
 
 
-def roformer_encoder(sentences):
-    # Tokenize sentences
-    encoded_input = tokenizer(
-        sentences, max_length=512, padding=True, truncation=True, return_tensors="pt"
-    )
+# def roformer_encoder(sentences):
+#     # Tokenize sentences
+#     encoded_input = tokenizer(
+#         sentences, max_length=512, padding=True, truncation=True, return_tensors="pt"
+#     )
 
-    # Compute token embeddings
-    with torch.no_grad():
-        model_output = model(**encoded_input)
+#     # Compute token embeddings
+#     with torch.no_grad():
+#         model_output = model(**encoded_input)
 
-    # Perform pooling. In this case, max pooling.
-    sentence_embeddings = mean_pooling(
-        model_output, encoded_input["attention_mask"]
-    ).numpy()
-    return sentence_embeddings
+#     # Perform pooling. In this case, max pooling.
+#     sentence_embeddings = mean_pooling(
+#         model_output, encoded_input["attention_mask"]
+#     ).numpy()
+#     return sentence_embeddings
 
 
 # @st.cache

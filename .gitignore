@@ -141,3 +141,5 @@ data
 .hadolint.yaml
 .isort.cfg
 .markdownlint.yaml
+fileidx
+fileraw

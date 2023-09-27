@@ -1,45 +1,46 @@
-import ast
+# import ast
 import io
-import os
 
 import pandas as pd
 import streamlit as st
 
-# Import for dyanmic tagging
-# from streamlit_tags import st_tags, st_tags_sidebar
-
 from analysis import df2list, do_plot_match, get_matchplc
-from checkaudit import get_sampleaudit, searchauditByItem, searchauditByName
-from checkrule import get_rule_data, searchByItem, searchByName,searchByNamesupa
-# from gptfuc import build_index, gpt_answer
-from upload import (
-    get_upload_data,
+
+# from checkaudit import get_sampleaudit, searchauditByItem, searchauditByName
+from checkrule import searchByIndustrysupa, searchByItem, searchByNamesupa
+from gptfuc import (  # add_to_index,
+    build_index,
+    convert_index_to_df,
+    gpt_vectoranswer,
+    searchupload,
+)
+from upload import (  # searchupload,; upload_data,; get_upload_data,
+    add_upload_folder,
+    copy_files,
     get_uploadfiles,
     remove_uploadfiles,
     save_uploadedfile,
     savedf,
-    searchupload,
-    upload_data,
 )
-from utils import (
-    df2aggrid,
-    get_auditfolder,
-    get_embedding,
-    # get_exect_similar,
-    get_folder_list,
-    # get_keywords,
-    # get_most_similar,
-    get_section_list,
-)
+from utils import get_folder_list
+
+# import os
+
+
+# Import for dyanmic tagging
+# from streamlit_tags import st_tags, st_tags_sidebar
+
 
 rulefolder = "data/rules"
 auditfolder = "data/audit"
+uploadfolder = "uploads"
+filerawfolder = "fileraw"
 
 
 def main():
 
     # st.subheader("制度匹配分析")
-    menu = ["文件上传", "文件选择", "匹配分析", "文件浏览"]
+    menu = ["文件上传", "文件选择", "匹配分析", "文件浏览", "文件问答"]
     choice = st.sidebar.selectbox("选择", menu)
 
     # initialize session value file1df, file1_embeddings
@@ -175,21 +176,65 @@ def main():
                     else:
                         st.error("不支持文件类型")
 
-        submit = st.button("文件编码")
-        if submit:
-            with st.spinner("正在处理中..."):
-                upload_data()
-                st.success("文件编码完成")
+        upload_list = get_uploadfiles(uploadfolder)
+        upload_choice = st.sidebar.multiselect("选择已上传文件:", upload_list, [])
+
+        if upload_choice == []:
+            st.error("请选择文件")
+            # return
+
+        file_list = upload_choice
+
+        # file choose button
+        file_button = st.sidebar.button("选择待编码文件")
+        if file_button:
+            # copy file_list to filerawfolder
+            copy_files(file_list, uploadfolder, filerawfolder)
+
+        # enbedding button
+        embedding = st.sidebar.button("重新生成模型")
+        if embedding:
+            # with st.spinner("正在生成问答模型..."):
+            # generate embeddings
+            try:
+                build_index()
+                st.success("问答模型生成完成")
+            except Exception as e:
+                st.error(e)
+                st.error("问答模型生成失败，请检查文件格式")
+
+        # add documnet button
+        # add_doc = st.sidebar.button("模型添加文档")
+        # if add_doc:
+        #     # with st.spinner("正在添加文档..."):
+        #     # generate embeddings
+        #     try:
+        #         add_to_index()
+        #         st.success("文档添加完成")
+        #     except Exception as e:
+        #         st.error(e)
+        #         st.error("文档添加失败，请检查文件格式")
+        remove = st.button("删除待编码的文件")
+        if remove:
+            remove_uploadfiles(filerawfolder)
+            st.success("删除成功")
+
+        # submit = st.sidebar.button("文件编码")
+        # if submit:
+        #     with st.spinner("正在处理中..."):
+        #         upload_data()
+        #         st.success("文件编码完成")
         # display all policy
         st.write("已编码的文件：")
-        uploadfilels = get_uploadfiles()
+        uploadfilels = get_uploadfiles(filerawfolder)
         # st.write(uploadfilels)
         # display all upload files
         for uploadfile in uploadfilels:
             st.markdown(f"- {uploadfile}")
-        remove = st.button("删除已上传文件")
+
+        remove = st.sidebar.button("删除已上传文件")
         if remove:
-            remove_uploadfiles()
+            remove_uploadfiles(uploadfolder)
             st.success("删除成功")
 
     elif choice == "文件选择":
@@ -209,7 +254,7 @@ def main():
             filetype_choice = st.session_state["file2_filetype"]
             section_choice = st.session_state["file2_section_list"]
         # get preselected filetype index
-        file_typels = ["监管制度", "审计程序", "已上传文件"]
+        file_typels = ["监管制度", "已上传文件"]
         if filetype_choice == "":
             filetype_index = 0
         else:
@@ -234,88 +279,88 @@ def main():
                 "选择行业:", industry_list, index=industry_index
             )
 
-            name_text = ""
-            rule_val, rule_list = searchByNamesupa(name_text, industry_choice)
+            rule_list = searchByIndustrysupa(industry_choice)
             rule_choice = st.sidebar.multiselect("选择匹配监管要求:", rule_list, rule_choice)
-            rule_section_list = get_section_list(rule_val, rule_choice)
-            rule_column_ls = st.sidebar.multiselect(
-                "选择章节:", rule_section_list, section_choice
-            )
-            if rule_column_ls == []:
-                column_rule = ""
-            else:
-                column_rule = "|".join(rule_column_ls)
-
-            if rule_choice != []:
-                ruledf, rule_embeddings = get_rule_data(rule_choice, industry_choice)
-                choosedf, _ = searchByItem(ruledf, rule_choice, column_rule, "")
-                # get index of rule
-                rule_index = choosedf.index.tolist()
-                choose_embeddings = rule_embeddings[rule_index]
-            else:
-                choosedf, choose_embeddings = None, None
-
-        elif file_type == "审计程序":
-
-            industry_list = get_folder_list(auditfolder)
-
-            # get preselected industry index
-            # if industry_choice in industry_list:
-            #     industry_index = industry_list.index(industry_choice)
+            rule_column_ls = []
+            # rule_section_list = get_section_list(rule_val, rule_choice)
+            # rule_column_ls = st.sidebar.multiselect(
+            #     "选择章节:", rule_section_list, section_choice
+            # )
+            # if rule_column_ls == []:
+            #     column_rule = ""
             # else:
-            industry_index = 0
-            rule_choice = []
-            section_choice = []
+            #     column_rule = "|".join(rule_column_ls)
 
-            industry_choice = st.sidebar.selectbox(
-                "选择行业:", industry_list, index=industry_index
-            )
+            # if rule_choice != []:
+            #     ruledf, rule_embeddings = get_rule_data(rule_choice, industry_choice)
+            #     choosedf, _ = searchByItem(ruledf, rule_choice, column_rule, "")
+            #     # get index of rule
+            #     rule_index = choosedf.index.tolist()
+            #     choose_embeddings = rule_embeddings[rule_index]
+            # else:
+            #     choosedf, choose_embeddings = None, None
 
-            if industry_choice != "":
-                name_text = ""
-                searchresult, choicels = searchauditByName(name_text, industry_choice)
+        # elif file_type == "审计程序":
 
-                rule_choice = st.sidebar.multiselect("选择监管制度:", choicels, rule_choice)
+        #     industry_list = get_folder_list(auditfolder)
 
-                if rule_choice == []:
-                    rule_choice = choicels
-                section_list = get_section_list(searchresult, rule_choice)
-                rule_column_ls = st.sidebar.multiselect(
-                    "选择章节:", section_list, section_choice
-                )
-                if rule_column_ls == []:
-                    column_text = ""
-                else:
-                    column_text = "|".join(rule_column_ls)
+        #     # get preselected industry index
+        #     # if industry_choice in industry_list:
+        #     #     industry_index = industry_list.index(industry_choice)
+        #     # else:
+        #     industry_index = 0
+        #     rule_choice = []
+        #     section_choice = []
 
-                if rule_choice != []:
-                    ruledf, _ = searchauditByItem(
-                        searchresult, rule_choice, column_text, "", "", ""
-                    )
-                    emblist = ruledf["监管要求"].unique().tolist()
-                    subsearchdf = get_sampleaudit(emblist, industry_choice)
-                    # fix index
-                    choosedf, _ = searchauditByItem(
-                        subsearchdf, emblist, column_text, "", "", ""
-                    )
-                    # get index of the rule
-                    ruledf_index = choosedf.index.tolist()
-                    choosefolder = get_auditfolder(industry_choice)
-                    sentence_embeddings = get_embedding(choosefolder, rule_choice)
-                    # get sub-embedding by index
-                    choose_embeddings = sentence_embeddings[ruledf_index]
-                else:
-                    choosedf, choose_embeddings = None, None
+        #     industry_choice = st.sidebar.selectbox(
+        #         "选择行业:", industry_list, index=industry_index
+        #     )
+
+        #     if industry_choice != "":
+        #         name_text = ""
+        #         searchresult, choicels = searchauditByName(name_text, industry_choice)
+
+        #         rule_choice = st.sidebar.multiselect("选择监管制度:", choicels, rule_choice)
+
+        #         if rule_choice == []:
+        #             rule_choice = choicels
+        #         section_list = get_section_list(searchresult, rule_choice)
+        #         rule_column_ls = st.sidebar.multiselect(
+        #             "选择章节:", section_list, section_choice
+        #         )
+        #         if rule_column_ls == []:
+        #             column_text = ""
+        #         else:
+        #             column_text = "|".join(rule_column_ls)
+
+        #         if rule_choice != []:
+        #             ruledf, _ = searchauditByItem(
+        #                 searchresult, rule_choice, column_text, "", "", ""
+        #             )
+        #             emblist = ruledf["监管要求"].unique().tolist()
+        #             subsearchdf = get_sampleaudit(emblist, industry_choice)
+        #             # fix index
+        #             choosedf, _ = searchauditByItem(
+        #                 subsearchdf, emblist, column_text, "", "", ""
+        #             )
+        #             # get index of the rule
+        #             ruledf_index = choosedf.index.tolist()
+        #             choosefolder = get_auditfolder(industry_choice)
+        #             sentence_embeddings = get_embedding(choosefolder, rule_choice)
+        #             # get sub-embedding by index
+        #             choose_embeddings = sentence_embeddings[ruledf_index]
+        #         else:
+        #             choosedf, choose_embeddings = None, None
 
         elif file_type == "已上传文件":
             if industry_choice != "":
                 rule_choice = []
-            upload_list = get_uploadfiles()
+            upload_list = get_uploadfiles(filerawfolder)
             upload_choice = st.sidebar.multiselect("选择已上传文件:", upload_list, rule_choice)
-            if upload_choice != []:
-                choosedf, choose_embeddings = get_upload_data(upload_choice)
-            else:
-                choosedf, choose_embeddings = None, None
+            # if upload_choice != []:
+            #     choosedf, choose_embeddings = get_upload_data(upload_choice)
+            # else:
+            #     choosedf, choose_embeddings = None, None
             industry_choice = ""
             rule_choice = upload_choice
             rule_column_ls = []
@@ -324,11 +369,19 @@ def main():
         file_button = st.sidebar.button("选择文件")
         if file_button:
             if file_choice == "选择文件1":
-                file1df, file1_embeddings = choosedf, choose_embeddings
+                # file1df, file1_embeddings = choosedf, choose_embeddings
                 file1_industry = industry_choice
                 file1_rulechoice = rule_choice
                 file1_filetype = file_type
                 file1_section_list = rule_column_ls
+
+                if file1_filetype == "监管制度":
+                    file1df, file1_embeddings = searchByNamesupa(
+                        file1_rulechoice, file1_industry
+                    )
+                else:
+                    file1df, file1_embeddings = convert_index_to_df(file1_rulechoice)
+
                 st.session_state["file1df"] = file1df
                 st.session_state["file1_embeddings"] = file1_embeddings
                 st.session_state["file1_industry"] = file1_industry
@@ -342,11 +395,20 @@ def main():
                 file2_filetype = st.session_state["file2_filetype"]
                 file2_section_list = st.session_state["file2_section_list"]
             elif file_choice == "选择文件2":
-                file2df, file2_embeddings = choosedf, choose_embeddings
+                # file2df, file2_embeddings = choosedf, choose_embeddings
                 file2_industry = industry_choice
                 file2_rulechoice = rule_choice
                 file2_filetype = file_type
                 file2_section_list = rule_column_ls
+
+                if file2_filetype == "监管制度":
+                    file2df, file2_embeddings = searchByNamesupa(
+                        file2_rulechoice, file2_industry
+                    )
+                else:
+                    file2df, file2_embeddings = convert_index_to_df(file2_rulechoice)
+
+                st.write(file2df)
                 st.session_state["file2df"] = file2df
                 st.session_state["file2_embeddings"] = file2_embeddings
                 st.session_state["file2_industry"] = file2_industry
@@ -486,13 +548,13 @@ def main():
             st.error("请选择文件2")
             return
 
-        match_method = st.sidebar.radio("匹配方法选择", ("语义匹配", "关键词匹配"))
+        match_method = st.sidebar.radio("匹配方法选择", ["语义匹配"])
         subruledf = file1df
         subrule_embeddings = file1_embeddings
-        uploaddf = file2df[['条款','结构','监管要求']]
+        uploaddf = file2df[["条款", "结构", "监管要求"]]
         upload_embeddings = file2_embeddings
 
-        st.write(uploaddf)
+        # st.write(uploaddf)
 
         # if match_method == "关键词匹配":
         #     # initialize session value proc_list
@@ -644,7 +706,7 @@ def main():
                 x = st.slider("匹配阈值选择%", min_value=0, max_value=100, value=80)
                 st.write("匹配阈值:", x / 100)
                 # review mode
-                review_mode = st.radio("审阅模式", ("否", "是"))
+                review_mode = st.radio("反向匹配模式", ("否", "是"))
 
             if review_mode == "否":
                 querydf, query_embeddings = subruledf, subrule_embeddings
@@ -720,7 +782,7 @@ def main():
                         slice_ = pd.IndexSlice[df_.index, df_.columns]
                         # st.write(slice_)
                         s = subdf.style.set_properties(
-                            **{"background-color": "yellow"}, subset=slice_
+                            **{"color": "red"}, subset=slice_
                         )
                         # display s in html format
                         st.table(s)
@@ -736,12 +798,12 @@ def main():
     elif choice == "文件浏览":
         st.subheader("文件浏览")
 
-        upload_list = get_uploadfiles()
+        upload_list = get_uploadfiles(filerawfolder)
         upload_choice = st.sidebar.multiselect("选择已上传文件:", upload_list)
         if upload_choice == []:
             upload_choice = upload_list
 
-        choosedf, choose_embeddings = get_upload_data(upload_choice)
+        choosedf, choose_embeddings = convert_index_to_df(upload_choice)
 
         # st.write(choosedf)
         match = st.sidebar.radio("搜索方式", ("关键字搜索", "模糊搜索"))
@@ -756,12 +818,16 @@ def main():
             item_text = st.sidebar.text_input("按条文关键字搜索")
 
             if item_text != "":
-                fullresultdf, total = searchByItem(
-                    choosedf, upload_choice, "", item_text
-                )
-                # new_keywords_list = item_text.split()
+                # convert upload full path
+                uploadfullls = add_upload_folder(upload_choice)
 
-                resultdf = fullresultdf[["制度", "结构", "条款"]]
+                fullresultdf, total = searchByItem(
+                    choosedf, uploadfullls, "", item_text
+                )
+
+                resultdf = fullresultdf[["监管要求", "结构", "条款"]]
+                # update resultdf columns
+                resultdf.columns = ["制度", "结构", "条款"]
 
                 if resultdf.empty:
                     placeholder.text("没有搜索结果")
@@ -790,12 +856,14 @@ def main():
                                 disdf1 = resultdf[(resultdf["制度"] == plc)][["结构", "条款"]]
                                 st.table(disdf1)
 
-                            disdf = choosedf[["制度", "结构", "条款"]].reset_index(drop=True)
+                            disdf = choosedf[["监管要求", "结构", "条款"]].reset_index(
+                                drop=True
+                            )
                             # st.write(disdf)
                             with tab2:
                                 # st.write(col)
 
-                                subdf = disdf[(disdf["制度"] == plc)][["结构", "条款"]]
+                                subdf = disdf[(disdf["监管要求"] == plc)][["结构", "条款"]]
                                 # Subset your original dataframe with condition
                                 df_ = subdf[(subdf["结构"].isin(col))]
                                 # st.write(df_)
@@ -804,7 +872,7 @@ def main():
                                 slice_ = pd.IndexSlice[df_.index, df_.columns]
                                 # st.write(slice_)
                                 s = subdf.style.set_properties(
-                                    **{"background-color": "yellow"}, subset=slice_
+                                    **{"color": "red"}, subset=slice_
                                 )
                                 # display s in html format
                                 st.table(s)
@@ -832,11 +900,9 @@ def main():
 
             if search:
                 with st.spinner("正在搜索..."):
-                    fullresultdf = searchupload(
-                        search_text, choosedf, choose_embeddings, top
-                    )
+                    resultdf = searchupload(search_text, upload_choice, top)
 
-                    resultdf = fullresultdf[:top][["制度", "结构", "条款"]]
+                    # resultdf = fullresultdf[:top][["监管要求", "结构", "条款"]]
 
                     # reset index
                     resultdf.reset_index(drop=True, inplace=True)
@@ -854,6 +920,51 @@ def main():
                 st.sidebar.warning("请输入搜索条件")
                 resultdf = st.session_state["search_result"]
 
+    elif choice == "文件问答":
+        st.subheader("文件问答")
+
+        upload_list = get_uploadfiles(filerawfolder)
+        upload_choice = st.sidebar.multiselect("选择已上传文件:", upload_list)
+        if upload_choice == []:
+            upload_choice = upload_list
+
+        # choose chain type
+        # chain_type = st.sidebar.selectbox(
+        #     "选择链条类型", ["stuff", "map_reduce", "refine", "map_rerank"]
+        # )
+        chain_type = "stuff"
+        # choose model
+        model_name = st.sidebar.selectbox(
+            "选择模型", ["gpt-35-turbo", "gpt-35-turbo-16k", "gpt-4", "gpt-4-32k"]
+        )
+
+        # choose top_k
+        top_k = st.sidebar.slider("选择top_k", 1, 10, 3)
+        # question input
+        question = st.text_area("输入问题")
+
+        # answer button
+        answer_btn = st.button("获取答案")
+        if answer_btn:
+            if question != "" and chain_type != "":
+                with st.spinner("正在获取答案..."):
+                    # get answer
+                    # answer = gpt_answer(question,chain_type)
+                    # docsearch = st.session_state["docsearch"]
+                    answer, sourcedb = gpt_vectoranswer(
+                        question,
+                        upload_choice,
+                        chain_type,
+                        top_k=top_k,
+                        model_name=model_name,
+                    )
+                    st.markdown("#### 答案")
+                    st.write(answer)
+                    with st.expander("查看来源"):
+                        st.markdown("#### 来源")
+                        st.table(sourcedb)
+            else:
+                st.error("问题或链条类型不能为空")
 
 
 if __name__ == "__main__":
